@@ -1,0 +1,327 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>8.(IndNotStandard)指標當然同樣也可以用任何symbol來調用指標</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h2 id="indnotstandard指標當然同樣也可以用任何symbol來調用指標">(IndNotStandard)指標當然同樣也可以用任何symbol來調用指標</h2>
+<p>以PriceAboveBelowMA指標為例，PriceAboveBelowMA指標為自行撰寫位於pkg/indicator資料夾底下的指標</p>
+<h3 id="我們延續「5.priceabovebelowma指標可用matype來決定要使用sma還是ema」文件">我們延續「5.PriceAboveBelowMA指標可用MAType來決定要使用SMA還是EMA」文件</h3>
+<ol>
+<li>
+<p>在指標檔多加MAValues slice與PricesAboveBelowMA slice</p>
+<p>這樣我在調用指標的同時可以得知<br>
+比較的ma值與收盤價為何<br>
+(PriceAboveBelowMA指標檔完整程式碼會附於文章最後)</p>
+</li>
+<li>
+<p>在getIndNotStandard策略檔的struct</p>
+<pre><code>type Strategy struct {
+	......
+
+	PriceAboveBelowMA *indicator.PriceAboveBelowMA
+}
+</code></pre>
+</li>
+<li>
+<p>在Subscribe()，在預設symbol之外，多訂閱一個DOGEUSDT kline</p>
+<pre><code>func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "5m"})
+
+	// 特別訂閱DOGEUSDT的kline
+	session.Subscribe(types.KLineChannel, "DOGEUSDT", types.SubscribeOptions{Interval: "5m"})
+}
+</code></pre>
+</li>
+<li>
+<p>在Run()，BindK的時候要填"DOGEUSDT"以及拿MarketDataStore要填"DOGEUSDT"</p>
+<pre><code>priceAboveBelowMAiw := types.IntervalWindow{Window: s.Window, Interval: s.Interval}
+s.PriceAboveBelowMA = &amp;indicator.PriceAboveBelowMA{IntervalWindow: priceAboveBelowMAiw}
+s.PriceAboveBelowMA.BindK(session.MarketDataStream, "DOGEUSDT", s.Interval)
+kLineStore, _ := session.MarketDataStore("DOGEUSDT")
+if klines, ok := kLineStore.KLinesOfInterval(s.Interval); ok {
+	s.PriceAboveBelowMA.LoadK((*klines)[0:])
+}
+s.PriceAboveBelowMA.OnUpdate(func(v float64) {
+	// There are three possible outcomes of this indicator: 0, 1, -1
+	// 0 stands price equals ma; 1 stands price above ma; -1 stands price below ma
+	// fmt.Println("PriceAboveBelowMA: ", v)
+})
+</code></pre>
+</li>
+<li>
+<p>在OnKLineClosed()可以拿到指標判斷的結果0,1,-1，還有比較的ma值與收盤價</p>
+<pre><code>aboveBelow := s.PriceAboveBelowMA.Last(0)
+maValue := s.PriceAboveBelowMA.MAValues.Last(0)
+closeprice := s.PriceAboveBelowMA.PricesAboveBelowMA.Last(0)
+
+fmt.Println("收盤價: ", closeprice, "MA值: ", maValue, "aboveBelow: ", aboveBelow)
+</code></pre>
+</li>
+<li>
+<p>在getIndNotStandard.yaml，backtest下的symbols區塊，記得填<br>
+DOGEUSDT</p>
+<pre><code>exchangeStrategies:
+- on: binance
+  getIndNotStandard:
+    symbol: BTCUSDT
+    interval: 5m
+    window: 60
+   
+backtest:
+  startTime: "2023-12-21"
+  endTime: "2023-12-22"
+  symbols:
+  - BTCUSDT
+  - DOGEUSDT
+  sessions: [binance]
+  # syncSecKLines: true
+  accounts:
+    binance:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 0.0
+        USDT: 10_000.0
+</code></pre>
+</li>
+<li>
+<p>terminal輸出結果：</p>
+<pre><code>收盤價:  0.09549 MA值:  0.09500061680999047 aboveBelow:  1
+收盤價:  0.09546 MA值:  0.0950156785539252 aboveBelow:  1
+收盤價:  0.0946 MA值:  0.09500204974887846 aboveBelow:  -1
+收盤價:  0.09507 MA值:  0.09500427762596442 aboveBelow:  1
+收盤價:  0.0951 MA值:  0.09500741606445738 aboveBelow:  1
+收盤價:  0.09498 MA值:  0.09500651717709811 aboveBelow:  -1
+收盤價:  0.09518 MA值:  0.09501220513850474 aboveBelow:  1
+收盤價:  0.09492 MA值:  0.09500918201920949 aboveBelow:  -1
+收盤價:  0.09503 MA值:  0.09500986457595673 aboveBelow:  1
+收盤價:  0.09486 MA值:  0.0950049509833024 aboveBelow:  -1
+收盤價:  0.09475 MA值:  0.09499659193466953 aboveBelow:  -1
+</code></pre>
+</li>
+</ol>
+<h3 id="priceabovebelowma指標檔完整程式碼">PriceAboveBelowMA指標檔完整程式碼</h3>
+<pre><code>package indicator
+
+import (
+	"time"
+
+	"github.com/c9s/bbgo/pkg/datatype/floats"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+const MaxNumOfPriceAboveBelowMA = 5_000
+const MaxNumOfPriceAboveBelowMATruncateSize = 100
+
+//go:generate callbackgen -type PriceAboveBelowMA
+type PriceAboveBelowMA struct {
+	Values             floats.Slice
+	MAValues           floats.Slice
+	PricesAboveBelowMA floats.Slice
+	updateCallbacks    []func(value float64)
+	types.IntervalWindow
+	EndTime time.Time
+	types.SeriesBase
+
+	// Ma type for using SMA or EWMA
+	MAType string
+	maEWMA *EWMA
+	maSMA  *SMA
+}
+
+func (inc *PriceAboveBelowMA) Last(i int) float64 {
+	return inc.Values.Last(i)
+}
+
+func (inc *PriceAboveBelowMA) Index(i int) float64 {
+	return inc.Last(i)
+}
+
+func (inc *PriceAboveBelowMA) Length() int {
+	return len(inc.Values)
+}
+
+var _ types.SeriesExtend = &amp;PriceAboveBelowMA{}
+
+func (inc *PriceAboveBelowMA) Update(value float64) {
+	// indicator calculation here...
+	// push value...
+
+	if len(inc.Values) == 0 {
+		switch inc.MAType {
+		case "SMA":
+			inc.maSMA = &amp;SMA{IntervalWindow: types.IntervalWindow{Window: inc.Window, Interval: inc.Interval}}
+		case "EWMA", "EMA":
+			inc.maEWMA = &amp;EWMA{IntervalWindow: types.IntervalWindow{Window: inc.Window, Interval: inc.Interval}}
+		default:
+			// default we use EWMA
+			// if outside didn't assign ma type, then use EWMA
+			inc.maEWMA = &amp;EWMA{IntervalWindow: types.IntervalWindow{Window: inc.Window, Interval: inc.Interval}}
+
+		}
+	}
+
+	var ma float64
+	switch inc.MAType {
+	case "SMA":
+		inc.maSMA.Update(value)
+		ma = inc.maSMA.Last(0)
+	case "EWMA", "EMA":
+		inc.maEWMA.Update(value)
+		ma = inc.maEWMA.Last(0)
+	default:
+		inc.maEWMA.Update(value)
+		ma = inc.maEWMA.Last(0)
+	}
+
+	// now I can get ma value and close price from strategy
+	inc.MAValues.Push(ma)
+	inc.PricesAboveBelowMA.Push(value)
+
+	if value &gt; ma {
+		inc.Values.Push(1)
+
+	} else if value &lt; ma {
+		inc.Values.Push(-1)
+	} else {
+		inc.Values.Push(0)
+	}
+
+	if len(inc.Values) &gt; MaxNumOfPriceAboveBelowMA {
+		inc.Values = inc.Values[MaxNumOfPriceAboveBelowMATruncateSize-1:]
+	}
+}
+
+func (inc *PriceAboveBelowMA) PushK(k types.KLine) {
+
+	if inc.EndTime != zeroTime &amp;&amp; k.EndTime.Before(inc.EndTime) {
+		return
+	}
+
+	inc.Update(k.Close.Float64())
+	inc.EndTime = k.EndTime.Time()
+	inc.EmitUpdate(inc.Values.Last(0))
+
+}
+
+// 這樣外部可以以收盤價的K線來bind
+func (inc *PriceAboveBelowMA) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
+	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
+}
+
+// 在外部載入K線
+func (inc *PriceAboveBelowMA) LoadK(allKLines []types.KLine) {
+	for _, k := range allKLines {
+		inc.PushK(k)
+	}
+}
+</code></pre>
+<h3 id="getindnotstandard策略檔完整程式碼">getIndNotStandard策略檔完整程式碼</h3>
+<pre><code>package getIndNotStandard
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+const ID = "getIndNotStandard"
+
+func init() {
+	// Register our struct type to BBGO
+	// Note that you don't need to field the fields.
+	// BBGO uses reflect to parse your type information.
+	bbgo.RegisterStrategy(ID, &amp;Strategy{})
+}
+
+type Strategy struct {
+	Symbol   string         `json:"symbol"`
+	Interval types.Interval `json:"interval"`
+	Window   int            `json:"window"`
+
+	PriceAboveBelowMA *indicator.PriceAboveBelowMA
+}
+
+func (s *Strategy) ID() string {
+	return ID
+}
+
+// func (s *Strategy) InstanceID() string {
+// 	return fmt.Sprintf("%s:%s:%s", ID, s.Symbol, s.Interval)
+// }
+
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "5m"})
+
+	// 特別訂閱DOGEUSDT的kline
+	session.Subscribe(types.KLineChannel, "DOGEUSDT", types.SubscribeOptions{Interval: "5m"})
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+
+	priceAboveBelowMAiw := types.IntervalWindow{Window: s.Window, Interval: s.Interval}
+	s.PriceAboveBelowMA = &amp;indicator.PriceAboveBelowMA{IntervalWindow: priceAboveBelowMAiw}
+	s.PriceAboveBelowMA.BindK(session.MarketDataStream, "DOGEUSDT", s.Interval)
+	kLineStore, _ := session.MarketDataStore("DOGEUSDT")
+	if klines, ok := kLineStore.KLinesOfInterval(s.Interval); ok {
+		s.PriceAboveBelowMA.LoadK((*klines)[0:])
+	}
+	s.PriceAboveBelowMA.OnUpdate(func(v float64) {
+		// There are three possible outcomes of this indicator: 0, 1, -1
+		// 0 stands price equals ma; 1 stands price above ma; -1 stands price below ma
+		// fmt.Println("PriceAboveBelowMA: ", v)
+	})
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+		aboveBelow := s.PriceAboveBelowMA.Last(0)
+		maValue := s.PriceAboveBelowMA.MAValues.Last(0)
+		closeprice := s.PriceAboveBelowMA.PricesAboveBelowMA.Last(0)
+
+		fmt.Println("收盤價: ", closeprice, "MA值: ", maValue, "aboveBelow: ", aboveBelow)
+
+	}))
+	return nil
+}
+</code></pre>
+<h3 id="getindnotstandard.yaml">getIndNotStandard.yaml</h3>
+<pre><code>exchangeStrategies:
+- on: binance
+  getIndNotStandard:
+    symbol: BTCUSDT
+    interval: 5m
+    window: 60
+   
+backtest:
+  startTime: "2023-12-21"
+  endTime: "2023-12-22"
+  symbols:
+  - BTCUSDT
+  - DOGEUSDT
+  sessions: [binance]
+  # syncSecKLines: true
+  accounts:
+    binance:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 0.0
+        USDT: 10_000.0
+</code></pre>
+<blockquote>
+<p>Written with <a href="https://stackedit.io/">StackEdit</a>.</p>
+</blockquote>
+</div>
+</body>
+
+</html>

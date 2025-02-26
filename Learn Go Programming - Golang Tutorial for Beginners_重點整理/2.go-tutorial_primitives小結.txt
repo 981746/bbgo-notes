@@ -1,0 +1,55 @@
+Primitive段落小結：
+
+*在go中宣告一個變數，等於給他一個0的值
+
+*integer unspecified type
+如果宣告一個int
+要看你的系統是怎樣的系統
+不同的系統go預設會宣告的int類型會不一樣
+所以如果沒有特別指明int的類型
+最後的int有可能是int32 int64 int128等等等不一定
+
+
+*signed integer
+unsigned integer(只支援正數)
+
+*int 對 int去做運算，結果的類型還是int
+所以運算結果可能會遺失訊息，自己要注意
+
+*在go語言中，數值要做運算，類型要一致，不然編譯器會提示錯誤
+
+*go的位元運算：bit operator and bit shifting
+
+*float32與float64，都有給一個數值範圍表
+給值的時候可以使用「e」這個記號
+
+*兩個數值都是float類型的運算
+  值得注意的是
+
+如果兩個數值都是float類型，那我們要去做運算
+以下都不支援：
+%//這個我剛剛有試過不行XD
+bit operator
+
+*complex number(複數)//跳過
+
+*兩種text type:
+string: utf-8 chacharacter
+跟另一種rune
+
+*string可以用[]來取值，但是還得用string()再轉一次才能轉成字元
+
+*string不能用[]來改其中的character的值
+
+**string可以轉換成a collection of bytes
+他說把東西傳到其他的地方(其他的服務、伺服器)，用byte會是比較好的形式
+
+*除了string外，還有一個特殊的text類型：rune
+utf-8 character →string
+utf-32 character→rune：can be 32 bits long not it must be
+any utf-8 character is a valid utf-32 characte
+
+*rune就是integer32
+rune類型的處理比較複雜，有需要才去研究
+
+_go

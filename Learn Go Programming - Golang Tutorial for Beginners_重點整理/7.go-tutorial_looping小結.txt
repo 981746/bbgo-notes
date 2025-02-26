@@ -1,0 +1,111 @@
+Looping小結
+
+
+*go語言的迴圈，感覺長得跟java差不多欸
+只是沒有括號
+然後i的assignment要用column equal operator
+
+for i := 0; i < 5; i++ {
+
+    fmt.Println(i)
+
+  }
+
+*同時宣告i與j作為counter的for迴圈例子
+到底甚麼情境會用到這個東西啊XD
+ for i, j := 0, 0; i < 5; i, j = i+1, j+1 {
+
+    fmt.Println(i, j)
+
+  }
+
+*在go語言
+可以直接i++
+但是不能i = i++
+
+*也可以把for迴圈的counter i的初始化寫在迴圈之外
+所以在for關鍵字後，原本counter i初始化的位置留空白，然後記得加分號
+那這個時候，變數i的範圍就處於main()這一層
+但一般的作法是，counter i的範圍被限制在for迴圈中
+
+
+*再一個特殊的方式是，把i++寫在for迴圈中，這樣也可以
+我本來是寫
+i :=0
+for ;i<5; {
+
+}
+但是編輯器的format功能自動把程式碼簡化成
+for i<5{
+
+}
+
+*go語言的無窮圈圈怎麼寫？
+  i := 0
+  for {
+
+    fmt.Println(i)
+    i++
+
+  }
+
+*如何結束無窮迴圈？使用break這個關鍵字
+
+*使用continue關鍵字直接跳到下一圈
+例子為：
+如果i為偶數，我們直接跳下一個迴圈
+所以就不會執行到後面的程式碼，就不會去印值
+也因此只有奇數值才會被印出來
+
+*nested forloop
+可以用巢狀迴圈做99乘法表
+
+*在巢狀迴圈我們想要出去，直接用break語法並不可行
+印了值才break，等於甚麼都沒有break到，break到也只是那一層而已
+
+我們可以在兩層迴圈之外，訂一個label，叫做Loop
+然後在我們想要的條件成立後，break Loop
+這樣會直接break這兩層迴圈
+
+
+*超好笑
+其實直接break的if判斷式，寫在fmt.Println()的前面
+然後使用一般的方法break
+根本不用設定label
+結果有點類似，但不一樣
+有趣
+
+哦，因為之前的邏輯是，先印值、再判斷>=3而後break
+這裡的邏輯是，先判斷>=3，直接break，沒有break才印值
+邏輯有點差異
+
+
+*用for迴圈去印出slice的index與value值
+然後range關鍵字後填的是slice這個資料集
+
+//這個語法比較像foreach欸
+//array、slice、map、string、channel(還沒教)都可以用這樣的方式去迴圈
+//也可以用這樣的方式去看string裡的每個字元
+  s := []int{1, 2, 3}
+  for index, v := range s {
+    fmt.Println(index, v)
+
+  }
+
+
+*用for迴圈+range關鍵字去拿string裡的字元
+
+
+*如果我們只想要印value值的話
+我們可以在本來index或key變數的地方，放底線
+這樣就可以只去拿資料集裡面的value
+  s := []int{1, 2, 3}
+  for _, v := range s {
+    fmt.Println(v)
+
+  }
+因為我們並不能寫for v := range s{}，一定要有index才找得到'value啊
+也不能寫for key,v := range s{}，然後只印v的值
+這樣編譯器會提示我們key這個變數宣告了但沒被使用
+這時，我們可以選擇用底線這個特殊的東西，宣告了但沒有使用是被允許的
+

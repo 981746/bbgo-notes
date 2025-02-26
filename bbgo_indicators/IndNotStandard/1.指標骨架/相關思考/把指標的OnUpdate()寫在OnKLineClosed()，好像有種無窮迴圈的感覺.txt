@@ -1,0 +1,64 @@
+#把指標的OnUpdate()寫在OnKLineClosed()，好像有種無窮迴圈的感覺
+
+把指標的OnUpdate()寫在OnKLineClosed()
+居然會不斷出現算出的指標值，而且好像有種無窮迴圈的感覺
+超詭異
+
+程式碼：
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+
+	priceCrossMaiw := types.IntervalWindow{Window: 20, Interval: s.Interval}
+	s.priceCrossMa = &indicator.PriceCrossMa{IntervalWindow: priceCrossMaiw}
+
+	symbol := s.Symbol
+	store, _ := session.MarketDataStore(symbol)
+	s.priceCrossMa.Bind(store)
+
+	// session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+
+		s.priceCrossMa.OnUpdate(func(v float64) {
+			fmt.Println("priceCrossMa: ", v)
+		})
+
+		fmt.Println(k, "End of m5 data")
+	}))
+	return nil
+}
+
+結果：
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+priceCrossMa:  23225.715
+

@@ -1,0 +1,248 @@
+在bbgo專案下如何使用callbackgen，來產生指標的callback method？
+
+c9s callbackgen github頁面：
+https://github.com/c9s/callbackgen
+
+
+一、先直接在callbackgen專案，執行此專案，測試這個專案給的範例
+
+1.切到目錄
+cd ~/bbgo
+
+2.下指令
+go get github.com/c9s/callbackgen
+
+3.查看目錄
+~/golib/pkg/mod/github.com/c9s
+
+下指令ls -las
+結果：
+// 的確是有一個callbackgen@v1.1.0
+// 目前我並不確定是否是因為我下go get指令而拿到callbackgen專案
+// 但總之我目前得到一個callbackgen專案，名為：callbackgen@v1.1.0
+4 dr-xr-xr-x  18 jenny jenny 4096 Dec 12 17:58 bbgo@v1.20.1-0.20211211151707-2a33fcfa8aa9
+4 dr-xr-xr-x  20 jenny jenny 4096 Dec  5 17:50 bbgo@v1.43.1
+4 dr-xr-xr-x  21 jenny jenny 4096 Dec 12 14:59 bbgo@v1.54.1-0.20231211141632-d960d4ff9542
+4 dr-xr-xr-x  21 jenny jenny 4096 Dec 14 12:28 bbgo@v1.54.1-0.20231213105019-2c7e42922b36
+4 dr-xr-xr-x  21 jenny jenny 4096 Dec 19 16:25 bbgo@v1.55.3
+4 dr-xr-xr-x   3 jenny jenny 4096 Jan  5 16:13 callbackgen@v1.1.0
+4 dr-xr-xr-x   4 jenny jenny 4096 Dec  5 17:40 requestgen@v1.3.0
+4 dr-xr-xr-x   5 jenny jenny 4096 Dec  5 18:08 requestgen@v1.3.5
+4 dr-xr-xr-x   5 jenny jenny 4096 Dec  7 11:49 requestgen@v1.3.6
+4 dr-xr-xr-x   5 jenny jenny 4096 Dec 12 17:58 rockhopper@v1.2.1-0.20210217093258-2661955904a9
+4 dr-xr-xr-x   5 jenny jenny 4096 Dec  5 17:40 rockhopper@v1.2.2-0.20220617053729-ffdc87df194b
+
+4.切到callbackgen專案
+cd ~/golib/pkg/mod/github.com/c9s/callbackgen@v1.1.0
+
+5.使用go run main.go來執行callbackgen專案
+// 奇怪，這個指令的詳細選項，我是哪裡查的，我怎麼知道要這樣打
+// 喔，callbackgen專案下有一個test.sh檔案
+// 裡面就有示範
+sudo go run main.go -type User -generateRemove -lockField mu -interface ./example/user
+
+6.要用sudo 執行go指令
+要先做一個設定
+因為
+「sudo has its own $PATH which is defined by the secure_path setting in your sudo config.」
+(1)先sudo visudo
+
+(2)在Defaults    secure_path =的最後
+加上:/usr/local/go/bin
+
+7.好，現在可以執行callbackgen專案了
+
+(1-1)先把專案示範的callbacks相關檔案刪掉
+sudo rm ./example/user/*_callbacks.go
+
+(1-2)查一下目錄狀態：
+ls example/user/
+
+結果：user.go
+
+(2-1)執行專案，就會自動產生callback檔
+sudo go run main.go -type User -generateRemove -lockField mu -interface ./example/user
+
+(2-2)查一下目錄狀態：
+ls example/user/
+
+結果：user.go  user_callbacks.go
+//看到了，的確會產生callback檔！酷
+
+
+二、接下來我們想在bbgo專案下，使用callbackgen這個專案
+
+1.還是一樣，我們先切到callbackgen專案
+cd ~/golib/pkg/mod/github.com/c9s/callbackgen@v1.1.0
+
+2.幫callbackgen專案編譯一個binary檔案
+下指令編譯：
+sudo go build
+
+產生的檔案會在~/golib/pkg/mod/github.com/c9s/callbackgen@v1.1.0專案資料夾之下
+剛剛我們用go run指令來執行callbackgen專案：
+sudo go run main.go -type User -generateRemove -lockField mu -interface ./example/user來執行
+
+現在我們其實可以用編譯出的binary檔來執行callbackgen專案：
+sudo ./callbackgen -type User -generateRemove -lockField mu -interface ./example/user
+
+
+3.要讓bbgo專案能夠讀取到我們編譯出的callbackgen binary檔
+所以我們要把callbackgen binary複製到~/golib/bin
+下複製指令：
+cp callbackgen ~/golib/bin
+
+4.我們使用callbackgen是為了要產生bbgo指標所需的callback檔案
+所以我們要先去建立一個bbgo指標程式碼檔案
+我會在bbgo/pkg/indicator資料夾下
+建立的名為PriceCrossMa的檔案
+因為我想寫一個價格上穿/下穿均線的指標
+
+5.指標應該要有的最最基本的內容可以從bbgo撰寫指標的說明文件拿到
+https://github.com/c9s/bbgo/blob/main/doc/development/indicator.md
+但直接貼過來會有很多問題
+變數名稱打錯之類的問題
+甚至是// go:generate callbackgen -type PriceCrossMa這一行
+因為//雙斜線後面多一個空白就導致無法正確產生callback檔案
+所以我這邊直接給一個修正過的版本：
+
+我的指標名稱為PriceCrossMa
+所以程式碼指標的struct，以及function的簽名都要跟著改
+以下是改好的版本
+___________________________________________
+package indicator
+
+import (
+	"github.com/c9s/bbgo/pkg/datatype/floats"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+//go:generate callbackgen -type PriceCrossMa
+type PriceCrossMa struct {
+	Values          floats.Slice
+	updateCallbacks []func(value float64)
+}
+
+func (inc *PriceCrossMa) Last(i int) float64 {
+	return inc.Values.Last(i)
+}
+
+func (inc *PriceCrossMa) Index(i int) float64 {
+	return inc.Last(i)
+}
+
+func (inc *PriceCrossMa) Length() int {
+	return len(inc.Values)
+}
+
+func (inc *PriceCrossMa) Update(close64 float64) {
+	// indicator calculation here...
+	// push value...
+
+	calculatedValue := close64 / 2
+	inc.Values.Push(calculatedValue)
+}
+
+func (inc *PriceCrossMa) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+// custom function
+func (inc *PriceCrossMa) CalculateAndUpdate(allKLines []types.KLine) {
+	if len(inc.Values) == 0 {
+		// preload or initialization
+		for _, k := range allKLines {
+			inc.PushK(k)
+
+		}
+
+		inc.EmitUpdate(inc.Last(0))
+	} else {
+		// update new value only
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
+		inc.EmitUpdate(inc.Last(0)) // produce data, broadcast to the subscribers
+	}
+}
+
+// custom function
+func (inc *PriceCrossMa) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+	// filter on interval
+	inc.CalculateAndUpdate(window)
+}
+
+// required
+func (inc *PriceCrossMa) Bind(updater KLineWindowUpdater) {
+	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
+}
+____________________________________
+
+
+
+6.在//go:generate callbackgen -type PriceCrossMa會出現一行白色小字
+滑鼠點run go generate./...
+這樣子在indicator資料夾下的指標都會被重新產生callback檔案
+
+點一下白色小字後，讓vs code跑一下
+就會自動出現一個叫pricecrossma_callbacks.go的檔案
+這樣我們指標所需的callback檔案就成功產生了！！！！！
+
+
+7.我稍微紀錄一下，bbgo最基本的指標，裡面的function是怎麼運作的
+
+在CalculateAndUpdate()-----------
+
+1.我們先對拿到的所有歷史K線跑一次迴圈
+每次都去呼叫PushK(k)
+
+2.或是如果有新的K棒進來
+我們也會去呼叫PushK(k)
+
+
+
+在PushK(k)-----------------------
+inc.Update(k.Close.Float64())//我們把收盤價取float64格式，再傳到Update()
+
+在Update()-----------------------
+在這裡是我們真正做指標計算的地方
+做完計算就要把計算完的值新增進Values這個slice裡
+應該是指標計算的結果都會放進這個slice
+inc.Values.Push(calculatedValue)
+
+
+再回到CalculateAndUpdate()-----------
+我們呼叫過PushK(k)，拿到收盤價、把指標結果計算出來、新增進結果slice
+而後我們還需要告知外部我們計算出指標值了
+所以我們會用inc.EmitUpdate(inc.Last(0))
+inc.Last(0)是最新計算出來的指標值
+
+
+這樣在bbgo的策略檔那邊
+OnUpdate()就可以收到計算出來的指標值
+// 但這個版本可能策略檔案那邊需要使用Bind()來把K線bind進指標
+// 這樣才能OnUpdate()拿到值
+// 我不確定這個想法對不對
+
+
+在Bind()-----------------------
+這是讓策略檔案那邊可以bind的function
+
+
+
+
+
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+

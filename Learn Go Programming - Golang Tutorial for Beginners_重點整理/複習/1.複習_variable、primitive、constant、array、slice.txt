@@ -1,0 +1,134 @@
+好 現在複習我的golang筆記
+嘗試寫bbgo策略後的第一次複習
+____
+*從變數篇開始
+
+1.我發現在bbgo裡，我很少用var來宣告欸
+整份vamcd策略用到var的只有三個地方XD 也太少
+
+其實很多地方直接「=」
+因為拿struct裡面定義的欄位
+其他地方通常用「:=」宣告
+
+2.變數的開頭大小寫與變數存取範圍有關，我寫的時候，完全沒在思考XD
+在strategy struct裡面我發現我定義的欄位有大寫有小寫，但定義的時候我應該沒有特別注意
+可能只是看別人怎麼寫就直接抄過來
+沒有意識XD
+
+3.Type conversions //寫bbgo時真的會忘記怎麼type conversion
+1.目標類型 + () 就變成一個conversion function
+2.str不能直接轉int，直接轉會是unicode數值，要用strconv package
+
+4.float轉int，會被去掉小數點
+注意型別轉換，可能產生的資料遺失問題
+
+___
+*primitive篇
+我覺得比較重要的是，變數一宣告預設是0這件事吧
+
+1.在go中宣告一個變數，等於給他一個0的值
+所以bool類型，宣告一個變數，沒有給值的話，直接會是false
+宣告一個int，但未給值，去印這個變數，直接會是0
+
+
+2.int去除int，結果的類型還是int，所以不會有小數點
+得要float去除float才行
+
+3.string可以用[]來取值，但是還得用string()再轉一次才能轉成字元
+___
+*constant
+
+1.constant常數的話，比較特別的是
+constant如果沒有註明類型，可以用= operator直接assign
+我記得一般的變數要用:= operator才能直接assign
+//我沒有注意欸 我找找 真的欸 常數是直接一個等號=就宣告了
+在pkg/indicator/v2/cross.go裡：
+const (
+  CrossOver  CrossType = 1.0
+  CrossUnder CrossType = -1.0
+)
+
+2.常數可以implicit conversion，而一般的變數不行
+  const a = 42 //int64
+  var b int16 = 27
+結果a與b雖然int類型不一樣，卻可以做運算
+__
+*array與slice篇
+
+array語法：
+    grades := [3]int{97, 85, 93} 
+    or grades := [...]int{97, 85, 93}
+    or var students [3]string
+       students[0] = "Lisa"
+
+slice語法：a := []int{1, 2, 3}
+
+
+1.我覺得array的重點是要有長度吧
+2.array size，用len(myarray)
+3.array是value type，把他指給另一個變數會複製整個array
+4.所以a陣列，可以用指標的方式指給b陣列
+  a := [...]int{1, 2, 3}
+  b := &a
+
+5.slice重點就是長度是動態的，而且本身是reference type
+所以把a，assign給b
+那a跟b指的是同一份資料
+
+6.slice可以從任意開始index，複製到任意結束index
+複製整個slice的語法為：a[:]
+a[8:9] 包含index 8位置的值，不包含index 9位置的值
+
+7.所以對array做slicing operation，並不是去複製資料建立新的array而是單純的去指位置
+意思是對slice而言fmt.Println(a[8:9])，是複製一份，然後可以印出來
+但對array而言fmt.Println(a[8:9])，只是去指這個位置，然後印出來
+
+8.用make()來建立slice
+方法一a := make([]int, 3)
+方法二a := make([]int, 3, 100) //capacity 100
+
+9.如果slice用append()會牽涉到capacity，有興趣再看
+好像append一個元素，如果超過本來的容量，會直接新增一倍還是多少倍的容量
+但用len()看就沒差，可以得到正確的length
+
+10.slice append 多個值
+a = append(a, 2, 3, 4, 5)
+
+11.slice append slice
+舉例
+a = append(a, []int{2, 3, 4, 5}...)
+b := append(a[:2], a[3:]...)
+
+12.slice可以pop值出來，但操作複雜，有需要再看
+
+//////////小結slice and array
+
+slice的長度是動態的
+slice是reference type
+所以slice可以assign給別人，指的是同一份資料
+可以slice從任意的index切小段，同時複製一份新的小段
+可以用make來建立slice
+slice可以append值，一個值多個值
+slice可以append其他的slice、其他的slice小段
+slice可以pop值出來，但操作複雜，有需要再看
+append()成本很高，請勿隨意使用
+奇怪append成本很高，那還有其他方式新增新的值嗎？
+
+array的長度是固定的
+array切小段，並不是複製，是指位置
+array是value type
+想要指同一份資料必須用指標來操作
+
+總覺得我在bbgo專案目前看下來的都是slice？？？(不確定)
+好像沒有看到用array欸
+
+golang的slice有push指令嗎？
+還是那是c9s另外做的function？
+怎麼記得在bbgo的v2 cross指標裡有用到puah
+https://ithelp.ithome.com.tw/m/articles/10242229
+嗯～看起來push是自己另外實作
+
+golang鐵人賽，看起來不錯
+https://ithelp.ithome.com.tw/m/users/20129540/ironman/3351
+
+_golang_複習

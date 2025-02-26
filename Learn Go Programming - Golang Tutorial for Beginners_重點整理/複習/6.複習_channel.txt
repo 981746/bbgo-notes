@@ -1,0 +1,107 @@
+[channel]
+1.用channels就基本上會用到go routine
+chnnels的存在就是為了同步go routines之間的資料
+
+2.宣告一個支援int類型的channel:
+ch := make(chan int)
+
+3.變數接從頻道來的資料(receiving goroutine)
+i := <-ch
+
+4.頻道接收資料 = 傳資料給頻道(sending goroutine)
+ch <- 42
+
+5.可以在一個go routine
+接從頻道來的資料與傳資料給頻道
+
+6.設定receive only channel  
+go func(ch <-chan int) {
+
+}(ch)
+
+參數ch
+channel類型 <-chan
+再註明此channel支援的資料類型int
+////所以 <-chan
+x <-chan
+用來接收參數
+
+
+7.設定send only channel
+go func(ch chan<- int) {//從 channel 到 int
+
+}(ch)
+參數ch
+channel類型 chan<- //chan是接收者，意即傳送到channel
+再註明此channel支援的資料類型int
+//// chan<-
+chan <- x
+chan是接收者，意即傳送到channel
+
+8.buffered channel，暫存50個int
+ch := make(chan int,50)
+
+一個go routine傳了兩個值
+另一個go routine一次只接收一個值
+所以deadlock!
+這個時候可以使用buffered channel來解決
+
+9.第二次從channel接收值，變數不用column equal
+    i := <-ch 
+    fmt.Println(i)
+	i = <-ch
+	
+10.use for range loop to receive value from channel
+but remember we should close the channel from sender
+that the size of channel would be determined
+※i represent value itself, not the index
+
+  go func(ch <-chan int) { //接收
+    for i := range ch {
+      fmt.Println(i)
+    }
+    wg.Done()
+  }(ch)
+  
+  go func(ch chan<- int) { //傳送
+    ch <- 42 //(1)把42傳到channel
+    ch <- 27 //把27傳到channel
+    close(ch)
+    wg.Done()
+  }(ch)
+  
+  
+11.用for迴圈 + comma ok syntax
+確認channel尚未關閉，然後印從channel來的值  
+  go func(ch <-chan int) { //接收
+    for {
+      if i, ok := <-ch; ok {
+        fmt.Println(i)
+
+      } else {
+        break
+      }
+
+    }
+    wg.Done()
+  }(ch)  
+  
+12.我們可以用defer關鍵字+匿名函式來關掉channel
+這樣就會gracely shutting down channel
+  defer func() {
+    close(logCh)
+  }()
+  
+13.chanel and select statement
+如果有多個頻道，我們可以區分不同頻道傳訊息來
+select case可以區分目前是哪一個頻道傳訊息來
+
+for {
+  select{
+    case entry := <-logCh:
+
+    case <- doneCh://如果有doneCh來的訊息就break迴圈
+        break
+
+  }
+}

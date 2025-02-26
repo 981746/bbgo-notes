@@ -1,0 +1,395 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>11.(IndV2NotIndSet)做一個v2版本的PriceAboveBelowMA指標</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h2 id="indv2notindset做一個v2版本的priceabovebelowma指標">(IndV2NotIndSet)做一個v2版本的PriceAboveBelowMA指標</h2>
+<ul>
+<li>
+<p>策略名稱為 getIndV2NotIndSet</p>
+</li>
+<li>
+<p>指標 strcut 名稱為 PriceAboveBelowMAStream</p>
+</li>
+<li>
+<p>指標 function 名稱為 PriceAboveBelowMA2</p>
+</li>
+<li>
+<p>執行回測</p>
+<pre><code>go run ./cmd/bbgo backtest --sync --config ~/bbgo/config/getIndV2NotIndSet.yaml
+</code></pre>
+</li>
+<li>
+<p>v2指標優點：不需要使用callbackgen了，程式碼會比較簡潔<br>
+但是我看到pkg/indicator/v2/stoch.go有用到callbackgen，所以有callback檔，不知道它是不是有特殊需要<br>
+大部分v2指標都不需要有callback檔</p>
+</li>
+<li>
+<p>v2指標最重要的應該是去embbed *types.Float64Series，很多東西在Float64Series處理掉了<br>
+詳情可查看pkg/types/series_float64.go</p>
+</li>
+<li>
+<p>用price+sma來調用此指標時，指標OnUpdate()的第一筆輸出結果會是0，滿奇怪的，不知道是甚麼問題？還是有可能是sma的問題？</p>
+</li>
+<li>
+<p>那甚麼時候preload klines，甚麼時候不用preload klines呢？</p>
+<p>如果是要把stream傳進指標再處理的話，就不用preload klines<br>
+如果是要在策略檔直接調用指標、取得指標值，就要preload klines才能計算正確</p>
+</li>
+</ul>
+<h3 id="步驟">步驟</h3>
+<ol>
+<li>
+<p>在pkg/indicator/v2目錄下建立一個priceAboveBelowMA.go</p>
+</li>
+<li>
+<p>以pkg/indicator/v2/sma.go作為骨架，貼上剛新建的檔案</p>
+</li>
+<li>
+<p>把出現SMA的字眼都改成PriceAboveBelowMA<br>
+大致改完：</p>
+<pre><code>package indicatorv2
+
+import (
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+const MaxNumOfPriceAboveBelowMA = 5_000
+
+type PriceAboveBelowMAStream struct {
+	*types.Float64Series
+	window    int
+	rawValues *types.Queue
+}
+
+func PriceAboveBelowMA2(source types.Float64Source, window int) *PriceAboveBelowMAStream {
+	s := &amp;PriceAboveBelowMAStream{
+		Float64Series: types.NewFloat64Series(),
+		window:        window,
+		rawValues:     types.NewQueue(window),
+	}
+	s.Bind(source, s)
+	return s
+}
+
+func (s *PriceAboveBelowMAStream) Calculate(v float64) float64 {
+	s.rawValues.Update(v)
+	sma := s.rawValues.Mean(s.window)
+	return sma
+}
+
+func (s *PriceAboveBelowMAStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPriceAboveBelowMA)
+}
+</code></pre>
+</li>
+<li>
+<p>奇怪，我看MACD、EWMA的v2版本，指標同名的function會直接叫MACD2、EWMA2<br>
+好像也不一定SMA就沒有如此<br>
+但我還是想用PriceAboveBelowMA2()這個名稱</p>
+</li>
+<li>
+<p>接下來要在指標檔內調用其他v2指標<br>
+我要用的是EWMA2</p>
+<p>直接在func PriceAboveBelowMA2(</p>
+<pre><code>maEWMA  :=  EWMA2(source, window)
+</code></pre>
+<p>這樣maEWMA拿到的是*EWMAStream<br>
+所以我還需要一個price stream之類的東西<br>
+我發現我無法在指標檔內部拿到price stream…</p>
+</li>
+<li>
+<p>決定從外部拿ewma stream與price stream<br>
+使用OnUpdate()拿到這兩個stream的最新值，再push進slice裡<br>
+接著在calculate()裡面分別取出最新的ema跟close price，做判斷</p>
+<p>整個改好的指標檔如下：</p>
+<pre><code>package indicatorv2
+
+import (
+	"github.com/c9s/bbgo/pkg/datatype/floats"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+const MaxNumOfPriceAboveBelowMA = 5_000
+
+type AboveBelowType float64
+
+const (
+	priceAboveMa AboveBelowType = 1.0
+	priceBelowMa AboveBelowType = -1.0
+	priceEuqalMa AboveBelowType = 0.0
+)
+
+type PriceAboveBelowMAStream struct {
+	*types.Float64Series
+	price, ma floats.Slice
+}
+
+func PriceAboveBelowMA2(price, ma types.Float64Source) *PriceAboveBelowMAStream {
+	// 本來想要使用stream對stream去做運算，但無法，目前不知道怎麼用
+	// maEWMA := EWMA2(source, window)
+	// closePrices := ClosePrices(source)
+	// 這兩個source 類型不一樣
+	// EWMA2的source是types.Float64Source
+	// ClosePrices是source KLineSubscription
+
+	// 所以最後直接從外部拿ema stream跟close price stream進來
+	// 使用OnUpdate()拿到這兩個stream的最新值，再push進slice裡
+	// 接著在calculate()裡面分別取出最新的ema跟close price，做判斷
+
+	s := &amp;PriceAboveBelowMAStream{
+		Float64Series: types.NewFloat64Series(),
+	}
+	price.OnUpdate(func(v float64) {
+		s.price.Push(v)
+		s.calculate()
+	})
+	ma.OnUpdate(func(v float64) {
+		s.ma.Push(v)
+		s.calculate()
+	})
+	// s.Bind(source, s)
+	// 這邊就不bind了，因為直接從外部拿ema stream跟close price stream進來
+	return s
+}
+
+func (s *PriceAboveBelowMAStream) calculate() { // Calculate在cross function為小寫，是因為沒有回傳值還是不想給外部用?
+	if s.price.Length() != s.ma.Length() {
+		return
+	}
+
+	current := s.price.Last(0) - s.ma.Last(0)
+	if current == 0.0 {
+		s.PushAndEmit(float64(priceEuqalMa))
+	} else if current &gt; 0 {
+		s.PushAndEmit(float64(priceAboveMa))
+	} else {
+		s.PushAndEmit(float64(priceBelowMa))
+	}
+
+}
+
+func (s *PriceAboveBelowMAStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPriceAboveBelowMA)
+}
+</code></pre>
+</li>
+<li>
+<p>在策略檔調用v2版PriceAboveBelowMA指標<br>
+在func (s *Strategy) Run(<br>
+先取得收盤價stream、再拿ewma stream<br>
+調用PriceAboveBelowMA2()時，傳入收盤價stream、ewma stream<br>
+所以我們做的是「收盤價大於或小於EMA的判斷」</p>
+<pre><code>price := session.Indicators(s.Symbol).CLOSE(types.Interval(s.Interval))
+ma := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.Window})
+isAboveBelow := PriceAboveBelowMA2(price, ma) // 把price stream跟ma stream傳進去
+isAboveBelow.OnUpdate(func(v float64) {
+	fmt.Println("PriceAboveBelowMA v2: ", v)
+})
+</code></pre>
+<p>在OnKLineClosed()以isAboveBelow.Last(0)拿到指標最新值</p>
+<pre><code>session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+
+	fmt.Println("isAboveBelow.Last(0): ", isAboveBelow.Last(0))
+
+}))
+</code></pre>
+</li>
+<li>
+<p>如果想做的是，「收盤價大於或小於"SMA"的判斷」<br>
+因為v2版的SMA()不在indicator set裡<br>
+所以要拿SMA stream要用這個方式：</p>
+<pre><code>kLines := KLines(session.MarketDataStream, s.Symbol, s.Interval)
+ma := SMA(ClosePrices(kLines), s.Window)
+</code></pre>
+<p>所以整個調用變成：</p>
+<pre><code>price := session.Indicators(s.Symbol).CLOSE(types.Interval(s.Interval))
+
+kLines := KLines(session.MarketDataStream, s.Symbol, s.Interval)
+ma := SMA(ClosePrices(kLines), s.Window)
+
+isAboveBelow := PriceAboveBelowMA2(price, ma) // 把price stream跟ma stream傳進去
+isAboveBelow.OnUpdate(func(v float64) {
+	fmt.Println("PriceAboveBelowMA v2: ", v)
+})
+</code></pre>
+</li>
+</ol>
+<h3 id="指標完整程式碼">指標完整程式碼</h3>
+<pre><code>package indicatorv2
+
+import (
+	"github.com/c9s/bbgo/pkg/datatype/floats"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+const MaxNumOfPriceAboveBelowMA = 5_000
+
+type AboveBelowType float64
+
+const (
+	priceAboveMa AboveBelowType = 1.0
+	priceBelowMa AboveBelowType = -1.0
+	priceEuqalMa AboveBelowType = 0.0
+)
+
+type PriceAboveBelowMAStream struct {
+	*types.Float64Series
+	price, ma floats.Slice
+}
+
+func PriceAboveBelowMA2(price, ma types.Float64Source) *PriceAboveBelowMAStream {
+	// 本來想要使用stream對stream去做運算，但無法，目前不知道怎麼用
+	// maEWMA := EWMA2(source, window)
+	// closePrices := ClosePrices(source)
+	// 這兩個source 類型不一樣
+	// EWMA2的source是types.Float64Source
+	// ClosePrices是source KLineSubscription
+
+	// 所以最後直接從外部拿ema stream跟close price stream進來
+	// 使用OnUpdate()拿到這兩個stream的最新值，再push進slice裡
+	// 接著在calculate()裡面分別取出最新的ema跟close price，做判斷
+
+	s := &amp;PriceAboveBelowMAStream{
+		Float64Series: types.NewFloat64Series(),
+	}
+	price.OnUpdate(func(v float64) {
+		s.price.Push(v)
+		s.calculate()
+	})
+	ma.OnUpdate(func(v float64) {
+		s.ma.Push(v)
+		s.calculate()
+	})
+	// s.Bind(source, s)
+	// 這邊就不bind了，因為直接從外部拿ema stream跟close price stream進來
+	return s
+}
+
+func (s *PriceAboveBelowMAStream) calculate() { // Calculate在cross function為小寫，是因為沒有回傳值還是不想給外部用?
+	if s.price.Length() != s.ma.Length() {
+		return
+	}
+
+	current := s.price.Last(0) - s.ma.Last(0)
+	if current == 0.0 {
+		s.PushAndEmit(float64(priceEuqalMa))
+	} else if current &gt; 0 {
+		s.PushAndEmit(float64(priceAboveMa))
+	} else {
+		s.PushAndEmit(float64(priceBelowMa))
+	}
+
+}
+
+func (s *PriceAboveBelowMAStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPriceAboveBelowMA)
+}
+</code></pre>
+<h3 id="策略完整程式碼">策略完整程式碼</h3>
+<pre><code>package getIndV2NotIndSet
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
+	. "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+const ID = "getIndV2NotIndSet"
+
+func init() {
+	// Register our struct type to BBGO
+	// Note that you don't need to field the fields.
+	// BBGO uses reflect to parse your type information.
+	bbgo.RegisterStrategy(ID, &amp;Strategy{})
+}
+
+type Strategy struct {
+	Symbol   string         `json:"symbol"`
+	Interval types.Interval `json:"interval"`
+	Window   int            `json:"window"`
+}
+
+func (s *Strategy) ID() string {
+	return ID
+}
+
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s:%s", ID, s.Symbol, s.Interval)
+}
+
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "5m"})
+
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+
+	// 新版PriceAboveBelowMA v2指標
+	price := session.Indicators(s.Symbol).CLOSE(types.Interval(s.Interval))
+	ma := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.Window})
+	isAboveBelow := PriceAboveBelowMA2(price, ma) // 把price stream跟ma stream傳進去
+	isAboveBelow.OnUpdate(func(v float64) {
+		fmt.Println("PriceAboveBelowMA v2: ", v)
+	})
+
+	// 如果是SMA，沒有在indicator set，所以要用這個方式
+	// price := session.Indicators(s.Symbol).CLOSE(types.Interval(s.Interval))
+
+	// kLines := KLines(session.MarketDataStream, s.Symbol, s.Interval)
+	// ma := SMA(ClosePrices(kLines), s.Window)
+
+	// isAboveBelow := PriceAboveBelowMA2(price, ma) // 把price stream跟ma stream傳進去
+	// isAboveBelow.OnUpdate(func(v float64) {
+	// 	fmt.Println("PriceAboveBelowMA v2: ", v)
+	// })
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+
+		// fmt.Println("isAboveBelow.Last(0): ", isAboveBelow.Last(0))
+
+	}))
+	return nil
+}
+</code></pre>
+<h3 id="yaml檔">yaml檔</h3>
+<pre><code>exchangeStrategies:
+- on: binance
+  getIndV2NotIndSet:
+    symbol: BTCUSDT
+    interval: 5m
+    window: 60
+      
+backtest:
+  startTime: "2023-12-21"
+  endTime: "2023-12-22"
+  symbols:
+  - BTCUSDT
+  - DOGEUSDT
+  sessions: [binance]
+  # syncSecKLines: true
+  accounts:
+    binance:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 0.0
+        USDT: 10_000.0
+</code></pre>
+<blockquote>
+<p>Written with <a href="https://stackedit.io/">StackEdit</a>.</p>
+</blockquote>
+</div>
+</body>
+
+</html>

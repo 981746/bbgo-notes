@@ -1,0 +1,396 @@
+Functions 小結
+
+*go程式的進入點，main()
+main()沒有參數、沒有return value
+
+*要建立一個function，需要func這個關鍵字
+function名稱的開頭大小寫，會影響這個function可以被存取的範圍
+小寫就是只能在此package被存取
+大寫就是可以被外部的package存取
+
+*以main()的格式來舉例最基本的一個function應該長怎樣
+func main() {
+
+}
+
+*有一個參數的function，參數名稱為msg、類型為string
+定義一個function的參數，英文是parameter
+func sayMessage(msg string) {
+  fmt.Println(msg)
+
+}
+
+*呼叫sayMessage() function，並填入參數，這時這個參數變成叫arguments
+我沒想過參數定義時與填入值時，英文居然有區分
+func main() {
+  sayMessage("Hello Go!")
+
+}
+
+*有兩個參數的function
+舉例：
+func sayMessage(msg string, idx int) {
+  fmt.Println(msg)
+  fmt.Println("The value of the index is", idx)
+
+}
+
+*當一個function，他的多個參數為同樣的類型，此時我們有語法糖可以用
+
+假設一個function定義時
+參數設定為兩個string的變數
+正常要這樣寫：
+func sayGreeting(greeting string, name string) {
+  fmt.Println(greeting, name)
+
+}
+因為參數為一樣的型別，所以go其實有一個語法糖可以用
+同樣類型的參數之間用逗號連接，然後在最後一個參數的地方，加上型別
+func sayGreeting(greeting, name string) {
+  fmt.Println(greeting, name)
+
+}
+
+*不同function()間參數的傳遞拿到的是copy的版本
+改其中一個function()裡的參數值，並不會影響到別的function()
+
+
+我們有一個main()
+我們有一個sayGreeting()
+
+
+在main()設定兩個變數
+一個是歡迎詞greeting
+一個是歡迎的人name
+此時呼叫sayGreeting(greeting, name)來講歡迎詞，並把參數填入
+然後我們在main()再印一次歡迎的人的名字
+
+在sayGreeting()中
+們先印傳進來的兩個參數，greeting, name
+然後我們偷偷改名子，把歡迎的人的名字改成Ted
+印一次新改的名字
+
+所以整個結果會是：
+Hello Stacey→我們先印傳進來的兩個參數，greeting, name
+Ted→印一次新改的名字
+Stacey→我們在main()再印一次歡迎的人的名字
+
+▲我們發現main()與sayGreeting()拿到的是copy版本的參數
+main()或sayGreeting()偷改了名子，另一方並不會跟著改
+
+*如果我想要main()的greeting, name變數
+與sayGreeting()的兩個參數greeting, name
+指向同一份資料的話，我們要怎麼做？可以運用指標
+[我覺得指標增加了很多程式碼撰寫上的自由度欸，本來有些東西是被語言限制，但是有了指標就可以改成自己想要的方式]
+[真的覺得很酷欸]
+[而且因為這個自由度，反而讓人對參數間的傳值方式更敏感，因為要自己去判斷想要哪種方式，會比較有這個意識]
+[傳copy與傳pointer，pointer會是更有效率的方式，就不用整份資料都去複製]
+
+
+
+我們在func定義的位置，參數最後的型別前加上*
+func sayGreeting(greeting, name *string){
+  fmt.Println(*greeting, *name)
+  *name = "Ted"
+  fmt.Println(*name)
+}
+
+然後在sayGreeting()要印參數時，記得dereferencing pointer
+fmt.Println(*greeting, *name)
+
+在main()使用sayGreeting()傳參數，傳的是記憶體位置，用&符號
+sayGreeting(&greeting, &name)
+
+
+
+*當function()參數為slice時，怎麼定義？
+
+sum(1, 2, 3, 4, 5)
+
+sum()一次傳5個參數
+然後在sum()的func定義中，參數的部分這樣寫
+func sum(values ...int){
+
+
+}
+意思是把拿到的一連串參數，轉成slice
+這個slice的變數名稱為value，型別為int
+
+//但我覺得這裡的語法跟之前的邏輯不太一致欸
+grades := [...]int{97, 85, 93}→這個是array
+a := []int{1, 2, 3}→這個是slice
+//所以我會覺得...三個點代表array
+//但沒想到在func()參數的部分，居然用三個點把東西轉成slice
+//有點意外
+
+▲我們可以用type switch來看一下，values這個參數的型別
+case []int:
+    fmt.Println("i is a int slice")
+所以真的是slice欸
+好妙喔
+而在驗證型別是不能以「[...]int」來驗證是否為array
+因為array是fixed type，所以length是一定要填
+所以要驗證是否為array要這樣「[3]int」
+除了這個方式，go語言沒有甚麼type()可以用嗎
+
+
+*除了type switch這個方式，go語言沒有甚麼type()可以用嗎
+有，有一個內建的lib叫reflect可以用
+
+
+*再把這個func()參數為slice的例子做完整一點
+傳進int slice後
+我們用for迴圈把這個slice的所有數字加總
+再印出加總的結果
+
+*在傳slice參數前，其實是可以傳別的類型的參數
+舉例：先傳string，再傳slice
+sum("The sum is", 1, 2, 3, 4, 5)
+
+func定義這樣寫：
+func sum(msg string, values ...int) {
+
+}
+
+*再一個例子，參數有int、string、slice
+sum(100, "The sum is", 1, 2, 3, 4, 5)
+
+func定義這樣寫：
+func sum(a int, msg string, values ...int) {
+
+}
+重點是這個slice參數，只能放在整個參數的最後面，這樣go語言才有辦法認得他
+
+
+*等一下喔 我覺得也可以傳array吧？
+可以，只是就不能1,2,3,4,5直接傳，要用array的語法
+
+傳一個legnth為5的int array，前方有其他參數
+sum(100, "The sum is", [5]int{1, 2, 3, 4, 5})
+
+func定義為：
+func sum(a int, msg string, values [5]int) {
+
+}
+
+
+*我突然想到三個點「...」在go語言中
+感覺是代表「有多個數值，但不知道有幾個」
+所以在定義array的語法中，先在[...]裡寫三個點，說明「有多個數值，但不知道有幾個」
+而最後在給值的時候才真正確定數量
+grades := [...]int{97, 85, 93}
+
+//
+在function的定義中，我們在int前放三個點來說明「有多個int數值，但不知道有幾個」
+而最後才傳值時才真正確定數量
+那能夠有多個值又不用確定數量的資料集，在go語言中，也只有slice了
+所以這裡表達的一定會是一個int型別的slice
+func sum(values ...int){
+
+
+}
+傳值：sum(1, 2, 3, 4, 5)
+
+//
+那在slice的宣告與初始化中，因為slice本來的length就是動態的，長度本來就不固定
+長度對slice來說並不那麼重要
+當然不用去特別給三個點說明「有多個數值，但不知道有幾個」
+所以slice的[ ]，會是空白
+a := []int{1, 2, 3}
+
+
+*function()的回傳值放在function定義的括號之後，curly braces之前
+function定義內部以return關鍵字來回傳值
+舉例：
+func sum(values ...int) int {
+  result := 0
+  return result
+}
+
+
+*go的特別能力，居然可以回傳指標
+return a local variable as a pointer
+對其他的程式語言來說很奇怪
+result變數在sum()的memory stack裡，一旦離開sum()，好像這個stack就被清掉
+所以一個應該被清掉的東西，還能給出指標，這就很奇怪了
+然後他說如果你設別指名要回傳result的指標，go會把你幫這個變數放在shared memory的heap裡
+
+在回傳值的型別之前加上*符號，在要回傳的變數前加上&，就會變成回傳記憶體位置
+func sum(values ...int) *int {
+  result := 0
+  return &result
+}
+在外部呼叫function()、接到回傳值之後，要dereferencing
+  s := sum(1, 2, 3, 4, 5)
+  fmt.Println("The sum is", *s)
+
+
+*named retruned value，也可以幫return value取名
+在主要function定義的括號之後，再寫一個括號()，裡面放回傳值的變數名與型別
+用這個方式，就不用特別把變數寫在return關鍵字之後
+也等於在function()定義時就宣告了一個變數，只是這個變數是用來回傳東西
+舉例：
+func sum(values ...int) (result int) {
+  fmt.Println(values)
+
+  for _, v := range values {
+    result += v
+
+  }
+  return
+}
+他說這個語法比較不常看到有人用，他覺得如果在一開始function()定義時就寫清楚回傳值
+然後往function()內一看，可以看到return關鍵字，知道在哪一行回傳值
+這樣就很容易讀程式碼
+但他說程式碼一長，可能又不太適合用這樣的語法，自己取捨
+
+
+*同時回傳兩個變數的例子
+兩個浮點數相除，分母為0，結果為+Inf(正的無限大)
+那這樣結果並不是exception
+
+
+*一個function()有兩個回傳值的例子，然後加上錯誤處理
+
+然後我們可以回傳分母為0這個值、回傳一個錯誤(而不是panic)
+所以有兩個情境
+當分母為0時，回傳分母0與錯誤訊息
+當分母不為0時，回傳a/b結果與nil
+
+然後在主程式的地方：
+有錯誤發生就會印錯誤訊息，然後提早離開main()
+沒有錯誤，就會往下印a/b的結果
+
+*匿名的function，而後加兩個括號直接調用
+func main() {
+  func() {
+    fmt.Println("Hello Go!")
+  }()
+
+}
+
+
+*在匿名function()裡，定義變數，等於建立了一個隔離的變數範圍
+而這個匿名function()在main()建立與調用，但裡面的變數卻不屬於main()
+func main() {
+  func() {
+    msg := "Hello Go!"
+    fmt.Println(msg)
+  }()
+
+})
+
+
+*如果把匿名function()放在for迴圈之下
+匿名function()是可以存取變數i的
+甚麼情境需要這樣弄啊？
+  for i := 0; i < 5; i++ {
+    func() {
+      fmt.Println(i)
+    }()
+
+  }
+
+
+*他說這時function是以asynchronously(異步)方式調用
+for迴圈的counter持續變大
+這樣可能會有奇怪的問題
+
+所以更好的做法是
+把i寫進function定義的參數位置
+  for i := 0; i < 5; i++ {
+    func(i int) {
+      fmt.Println(i)
+    }(i)
+
+  }
+
+
+*好酷喔 可以把匿名function()直接指給一個變數
+然後變數名稱加上()，就可以直接執行function
+  f := func() {
+    fmt.Println("Hello Go!")
+  }
+  f()
+
+
+*那我們用正式一點的方式來宣告變數、類型為匿名function()
+那這個類型要怎麼定義？
+func main() {
+  var f func() = func() {
+    fmt.Println("Hello Go!")
+  }
+  f()
+
+}
+
+*再用更複雜的方式定義這個匿名function
+先用var宣告，而後給值，也加上兩數相除有錯誤處理的例子整合再一起
+
+func main() {
+
+  var divide func(float64, float64) (float64, error)
+
+  divide = func(a, b float64) (float64, error) {
+    if b == 0.0 {
+      return 0.0, fmt.Errorf("Cannot devide by zero")
+    } else {
+      return a / b, nil
+    }
+
+  }
+  d, err := divide(5.0, 3.0)
+  if err != nil {
+    fmt.Println(err)
+    return
+
+  }
+  fmt.Println(d)
+
+}
+
+*那在main()
+以先用var宣告，而後給值去定義匿名function()
+的問題在於
+"function()的執行一定要在定義之後"
+所以這邊調用在function()定義之前，出現undefined錯誤
+
+而一般的func()宣告在main()之外，然後在main()的任何地方都可以調用函式
+
+
+*現在要談，名為method的function
+function() is excuting in a known context(any type)
+
+感覺是function()與type掛勾
+function在type的範圍下被執行？
+
+所以這邊是greet()方法會複製一份greeter object
+然後去印這個object的greeting以及name
+//
+我在想這到底是怎麼運作的啊？
+所以是g.greet()，g去調用greet()
+因為變數g是struct，型別為greeter
+而func()定義寫(g greeter)
+g.greet()時直接複製了一份g的copy給greet()
+
+
+*那如果在greet()改name變數的值
+改成空字串
+其實是不會影響到在main()的g.name
+因為greet()接收到的greeter struct只是一份copy，而不是指標
+那要記得，用這樣的方式會複製整份struct object，所以會需要比較多資源
+但好處因為是copy，內部的變數不會互相影響
+
+這樣好像叫value receiver
+
+
+*然後也可以把method改成指標版本，叫pointer receiver
+而且這樣寫還會自動dereferencing
+裡面可以直接g.name，而不用  (*g).name = ""
+
+
+*variadic parameter
+是像這樣
+sum(1, 2, 3, 4, 5)
+___
+www.m-w.com查不到這個字欸

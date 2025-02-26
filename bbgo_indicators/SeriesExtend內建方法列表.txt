@@ -1,0 +1,37 @@
+pkg/types/series.go檔案
+
+type SeriesExtend interface {
+	Series
+	Sum(limit ...int) float64
+	Mean(limit ...int) float64
+	Abs() SeriesExtend
+	Predict(lookback int, offset ...int) float64
+	NextCross(b Series, lookback int) (int, float64, bool)
+	CrossOver(b Series) BoolSeries
+	CrossUnder(b Series) BoolSeries
+	Highest(lookback int) float64
+	Lowest(lookback int) float64
+	Add(b interface{}) SeriesExtend
+	Minus(b interface{}) SeriesExtend
+	Div(b interface{}) SeriesExtend
+	Mul(b interface{}) SeriesExtend
+	Dot(b interface{}, limit ...int) float64
+	Array(limit ...int) (result []float64)
+	Reverse(limit ...int) (result floats.Slice)
+	Change(offset ...int) SeriesExtend
+	PercentageChange(offset ...int) SeriesExtend
+	Stdev(params ...int) float64
+	Rolling(window int) *RollingResult
+	Shift(offset int) SeriesExtend
+	Skew(length int) float64
+	Variance(length int) float64
+	Covariance(b Series, length int) float64
+	Correlation(b Series, length int, method ...CorrFunc) float64
+	AutoCorrelation(length int, lag ...int) float64
+	Rank(length int) SeriesExtend
+	Sigmoid() SeriesExtend
+	Softmax(window int) SeriesExtend
+	Entropy(window int) float64
+	CrossEntropy(b Series, window int) float64
+	Filter(b func(i int, value float64) bool, length int) SeriesExtend
+}

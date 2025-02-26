@@ -1,0 +1,12 @@
+[go routine]
+1.WaitGroups是用來等另外一個go routine做完事
+本來的go routine如果太早結束，另外一個go routine印的東西會看不到
+本來的go routine必須等另外一個go routine印完東西才能結束
+
+2.sync.Mutex、sync.RWMutex解決的是變數race condition的問題
+不同go routine互相競爭存取、修改同一個變數，會有問題
+
+
+3.在compile的時候，可以下go run -race main.go指令
+go語言會給我們相關的警告
+告訴我們哪邊可能發生race condition

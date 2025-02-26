@@ -1,0 +1,43 @@
+#指標的OnUpdate直接寫在Run()，會取到1m的指標值
+
+程式碼：
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+
+	priceCrossMaiw := types.IntervalWindow{Window: 20, Interval: s.Interval}
+	s.priceCrossMa = &indicator.PriceCrossMa{IntervalWindow: priceCrossMaiw}
+
+	symbol := s.Symbol
+	store, _ := session.MarketDataStore(symbol)
+	s.priceCrossMa.Bind(store)
+
+	s.priceCrossMa.OnUpdate(func(v float64) {
+		fmt.Println("priceCrossMa: ", v)
+	})
+	// session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+		fmt.Println(k, "End of m5 data")
+	}))
+	return nil
+}
+
+結果：
+priceCrossMa:  21610.125
+priceCrossMa:  21623.52
+priceCrossMa:  21597.745
+priceCrossMa:  21595.865
+priceCrossMa:  21596.76
+priceCrossMa:  21596.76
+{155518 binance BTCUSDT 2022-02-28 23:50:00 +0000 UTC 2022-02-28 23:54:59.999 +0000 UTC 5m 43216.18 43193.52 43300 43171.63 243.33947 10518273.7228757 143.99308 6225245.3980906 0 0 true} End of m5 data
+
+
+喔喔，雖然yaml檔指明interval為5m
+exchangeStrategies:
+- on: binance
+  getIndNotStandard:
+    symbol: BTCUSDT
+    interval: 5m
+
+
+但是直接把指標的OnUpdate直接寫在Run()
+會取到1m的指標值
+

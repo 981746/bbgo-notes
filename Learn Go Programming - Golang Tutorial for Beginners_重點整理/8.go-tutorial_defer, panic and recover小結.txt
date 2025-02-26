@@ -1,0 +1,186 @@
+Defer, Panic and Recover小結
+
+
+*defer好像是先調用一個函式，但實際執行是比較晚的時間
+
+*一般來說
+go的程式碼是一行一行照順序執行的
+
+*在main()裡，看到有使用defer的程式碼
+沒有使用defer關鍵字的程式碼就是照順序執行完
+等到main()結束
+go才會去執行剛剛以defer關鍵字標記的程式碼
+
+*再講得更清楚一點
+defer關鍵字造成程式碼延後執行的時機
+是
+after的main()，but before the main()return
+也就是在main()結束後，與在main()回傳值之前
+這一段時間
+
+*以defer關鍵字調用的程式碼的執行順序為
+LIFO
+last in first out
+後進先出
+
+會這樣設計的原因是，我們通常用defer關鍵字把資源關掉
+而一個資源通常會依賴於另一個資源
+所以關掉的順序從最後面的開始關，才比較不會有問題
+
+*一個擷取網頁資源的例子
+
+*可以運用defer關鍵字在關閉資源的res.Body.Close()這行程式碼
+通常程式可能在一個function()內多次拿取資料
+那我們可能會忘記關
+但也不能太早關，這樣就無法拿資料
+defer關鍵字的好處是
+不管關資源的程式碼位於function()的哪一個位置
+他都會等到function()結束才去關資源
+這樣就不會影響我們拿資料這件事
+
+以這個例子而言，以defer關鍵字+關掉資源，寫在讀取資料的前面
+這樣是沒問題的
+所以通常會把open resource與close resource+defer關鍵字寫在一起
+這樣就不會忘記關
+
+通常這一整段程式碼都是在一起的：
+  res, err := http.Get("http://www.google.com/robots.txt")
+  if err != nil {
+    log.Fatal(err)
+
+  }
+  defer res.Body.Close()
+
+
+*如果你是用for迴圈取資料的話
+他說如果你打開了一堆資源
+其實就不太適合用defer
+這樣會等到整個function結束才去關
+
+而過程中我們在for迴圈開了太多的資源，這樣會浪費記憶體
+應該要自己特別去關掉
+
+
+*那defer遇到變數重新assign會怎麼樣？
+defer關鍵字拿到的參數會是調用當下的參數
+
+*現在要講panic
+然後他說go語言，並沒有exception這個東西
+
+*打開一個檔案
+但是檔案不存在
+go會回傳錯誤值
+但不會給exception
+
+go沒有exception，但有panic
+
+*一個例子
+a/b，b是分母，b為0
+執行程式，go會自動給一個panic的訊息
+
+*還有一個panic()函式可以使用，讓我們也可以主動丟panic出來
+
+
+*做一個http server
+當進入/這一頁時，就印出Hello GO!字串
+port為localhost:8080
+我們先把程式執行起來，當然可以在網頁上看到Hello GO!字串
+
+然後呢在vs code，再開一個terminal
+再執行一次run go main.go嘗試開啟http server
+這時，go會丟出panic，因為我們已經開了一個http server把8080 port佔住了
+當然不能再開一個
+panic: listen tcp :8080: bind: address already in use
+
+goroutine 1 [running]:
+main.main()
+        /home/jenny/code/src/bitbucket.org/981746/go-tutorial/defer_panic_and_recover/main.go:14 +0x8d
+exit status 2
+
+按照這個程式碼看，感覺就是error發生，就丟出panic：
+  if err != nil {
+    panic(err.Error())
+  }
+欸他的這個port占用的訊息，是由err.Error()自動產生的欸，那我們要怎麼知道還可能有其他的哪些錯誤啊？
+以其他語言的想法，應該會想要catch不同的錯誤
+那go語言呢？會特別去處理不同的錯誤嗎？
+
+
+*
+err := http.ListenAndServe(":8080", nil)
+  if err != nil {
+    panic(err.Error())
+  }
+在這個http server的例子裡
+這個panic是我們主動產生的
+而不是http listener丟的
+http listener只產生了錯誤，然後整個程式會繼續執行
+
+所以我寫一個不丟panic的範例
+雖然http listener出現錯誤，但程式還是繼續往下執行，然後印last這個字串
+
+所以要不要丟panic，讓整個程式停止執行，是由開發者來決定
+go語言很少會丟panic出來，通常是丟錯誤
+
+
+*先調用了defer，而後發生panic
+那個defer還會被執行嗎？
+結果居然是這個defer在panic前先被執行了
+
+所以就算有panic的發生也不用擔心資源的開與關
+
+
+*用defer關鍵字來調用一個匿名的custom function()
+在匿名的function()中，去呼叫recover()
+
+
+之後感覺好像是遇到panic("something bad happened")
+程式crash
+然後我們去調用defer匿名函式
+去執行recover()
+然後如果執行的結果有錯誤就印出錯誤
+
+那整個程式看起來會覺得沒有crashXD
+我的疑問是，這個defer匿名函式，是在panic發生之後，才執行的喔？
+可是之前的例子是，panic發生之前，會先去掉用defer把資源關掉
+總覺得行為不太一樣
+
+
+*再一個例子
+我猜這個例子的執行順序會是
+start
+about to panic
+遇到defer function() 這個之後才會掉用
+遇到panic()
+所以去找defer function()去recover()
+有錯誤會印錯誤 Error:something bad happened
+然後印panic之後的字串done panicking
+回到主程式，然後end
+
+//再重新整理一下，所以會這樣印吧？
+start
+about to panic
+Error:something bad happened
+done panicking
+end
+
+結果為
+start
+about to panic
+Error:something bad happened
+end
+
+所以done panicking在panicker()裡因為panic發生，就沒有被執行到啊....
+然後panicker()完也被recover()
+的確是會回到主程式
+再繼續執行
+
+
+*如果你覺得error不是我們可以處理的
+或是說不應該recover
+那可以再panic()一次
+這樣就叫做re panic
+
+這樣等於沒有recover()成功
+所以不會回到main()去印end字串
+

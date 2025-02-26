@@ -1,0 +1,70 @@
+package getIndV2IndSet
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
+	. "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+const ID = "getIndV2IndSet"
+
+func init() {
+	// Register our struct type to BBGO
+	// Note that you don't need to field the fields.
+	// BBGO uses reflect to parse your type information.
+	bbgo.RegisterStrategy(ID, &Strategy{})
+}
+
+type Strategy struct {
+	Symbol   string         `json:"symbol"`
+	Interval types.Interval `json:"interval"`
+	Window   int            `json:"window"`
+
+	ewma *EWMAStream
+}
+
+func (s *Strategy) ID() string {
+	return ID
+}
+
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s:%s", ID, s.Symbol, s.Interval)
+}
+
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "5m"})
+
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+
+	// 從session取Indicators()，再呼叫EWMA()，代表用的是indicator set裡面的EWMA
+	// 也就是indicatorv2 package底下的EWMAStream
+	// 從indicator set調用指標並不用手動preload kline，bbgo會自動幫你preload
+	// 直接OnUpdate就可以拿到EWMA的值或是在OnKLineClosed()裡用Last(0)拿到最後一個指標值
+
+	// 方式一直接在Run()用column equial宣告一個ewma變數接指標實體
+	ewma := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.Window})
+	ewma.OnUpdate(func(v float64) {
+		// fmt.Println("EWMA - indicator set: ", v)
+	})
+
+	// 方式2，把ewma變數宣告在struct裡
+	// 這樣就可以在Run()用s.ewma接指標實體
+	s.ewma = session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.Window})
+	s.ewma.OnUpdate(func(v float64) {
+		// fmt.Println("EWMA - indicator set: ", v)
+	})
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+		// 方式一的ema.Last(0)
+		// fmt.Println("ewma.Last(0): ", ewma.Last(0))
+
+		// 方式二的s.ewma.Last(0)
+		fmt.Println("s.ewma.Last(0): ", s.ewma.Last(0))
+	}))
+	return nil
+}

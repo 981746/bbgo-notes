@@ -1,0 +1,143 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>15.(IndV2)不同「拿收盤價的方式」 + 不同「指標實作方式」會影響bbgo是否自動載入歷史K線資料</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h2 id="indv2不同「拿收盤價的方式」--不同「指標實作方式」會影響bbgo是否自動載入歷史k線資料">(IndV2)不同「拿收盤價的方式」 + 不同「指標實作方式」會影響bbgo是否自動載入歷史K線資料</h2>
+<p>會不會自動載入歷史K線的重點有幾個：</p>
+<ol>
+<li>
+<p>指標是否以s.Bind(source, s)+Calculate()方式實作</p>
+</li>
+<li>
+<p>是否拿的是Backfill過的K線資料(indicator set取K線資料會自動Backfill)</p>
+</li>
+<li>
+<p>或是直接從indicaotr set調用v2版指標(以EWMA，方法三為例)</p>
+<p>所以自動載入歷史K線的發生條件為<br>
+1.+2. or 3.</p>
+</li>
+</ol>
+<p>注意事項：</p>
+<ul>
+<li>調用指標時最好都去確認指標的Length()，確認是否有自動載入歷史K線</li>
+<li>V2指標(Ex: EWMA2)以s.Bind(source, s)+Calculate()會自動載入歷史K線<br>
+v2版指標如果不是以此方式實作，就算搭配Backfill過的K線資料，還是需要手動載入歷史K線<br>
+因為我的zscore()已經改版完成，所以這邊沒辦法做此示範</li>
+</ul>
+<h3 id="以下提供三種調用v2指標且正確載入歷史k線的方法：">以下提供三種調用v2指標且正確載入歷史K線的方法：</h3>
+<h3 id="方法一，需要手動載入歷史k線">方法一，需要手動載入歷史K線</h3>
+<p>從indicatorv2 package取得K線資料，就不會自動載入歷史K線<br>
+EWMA也直接從indicatorv2 package調用<br>
+ewma.Length(): 1，如果沒有手動載入K線，會從1開始<br>
+如果有手動載入歷史K線會從1001開始</p>
+<h4 id="先示範沒有手動載入歷史k線的狀況：">1.先示範沒有手動載入歷史K線的狀況：</h4>
+<p>先import indicatorv2 package</p>
+<pre><code>import (
+......
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
+)
+</code></pre>
+<p>在Run()</p>
+<pre><code>kLines := indicatorv2.KLines(session.MarketDataStream, s.Symbol, s.Interval)
+ewma := indicatorv2.EWMA2(indicatorv2.ClosePrices(kLines), s.Window)
+
+ewma.OnUpdate(func(value float64) {
+	// OnUpdate() will trigger only when there is a new ewma value coming in
+	fmt.Println("ewma:", value, "ewma.Length():", ewma.Length())
+})
+</code></pre>
+<p>輸出結果：</p>
+<pre><code>ewma: 45354.39 ewma.Length(): 1
+ewma: 45352.40419354839 ewma.Length(): 2
+ewma: 45351.47940686785 ewma.Length(): 3
+......
+
+ewma: 47305.649117880734 ewma.Length(): 286
+ewma: 47291.93562640456 ewma.Length(): 287
+</code></pre>
+<h4 id="增加手動載入歷史k線的邏輯">2.增加手動載入歷史K線的邏輯</h4>
+<p>Run()改成</p>
+<pre><code>kLines := indicatorv2.KLines(session.MarketDataStream, s.Symbol, s.Interval)
+ewma := indicatorv2.EWMA2(indicatorv2.ClosePrices(kLines), s.Window)
+
+// 因此得手動載入歷史K線
+if store, ok := session.MarketDataStore(s.Symbol); ok {
+	if kLinesData, ok := store.KLinesOfInterval(s.Interval); ok {
+		for _, k := range *kLinesData {
+			kLines.EmitUpdate(k)
+
+		}
+	}
+}
+ewma.OnUpdate(func(value float64) {
+	// OnUpdate() will trigger only when there is a new ewma value coming in
+	fmt.Println("ewma:", value, "ewma.Length():", ewma.Length())
+})
+</code></pre>
+<p>輸出結果</p>
+<pre><code>ewma: 45332.44338652186 ewma.Length(): 1001
+ewma: 45331.87349061723 ewma.Length(): 1002
+ewma: 45332.27326541612 ewma.Length(): 1003
+......
+
+ewma: 47305.64911775864 ewma.Length(): 1286
+ewma: 47291.935626290346 ewma.Length(): 1287
+</code></pre>
+<h3 id="方法二，不需要手動載入歷史k線">方法二，不需要手動載入歷史K線</h3>
+<p>從indicator set取得K線資料，會自動幫我們BackFill()歷史K線資料<br>
+EWMA2直接從indicatorv2 package調用(EWMA2指標以s.Bind(source, s)+Calculate()實作)<br>
+ewma.Length(): 1001，會從1001開始</p>
+<p>在Run()</p>
+<pre><code>kLines := session.Indicators(s.Symbol).KLines(s.Interval)
+ewma := indicatorv2.EWMA2(indicatorv2.ClosePrices(kLines), s.Window)
+ewma.OnUpdate(func(value float64) {
+	// OnUpdate() will trigger only when there is a new ewma value coming in
+	fmt.Println("ewma:", value, "ewma.Length():", ewma.Length())
+})
+</code></pre>
+<p>輸出結果：</p>
+<pre><code>ewma: 45332.44338652186 ewma.Length(): 1001
+ewma: 45331.87349061723 ewma.Length(): 1002
+ewma: 45332.27326541612 ewma.Length(): 1003
+......
+
+ewma: 47315.94491898337 ewma.Length(): 1285
+ewma: 47305.64911775864 ewma.Length(): 1286
+ewma: 47291.935626290346 ewma.Length(): 1287
+</code></pre>
+<h3 id="方法三，不需要手動載入歷史k線">方法三，不需要手動載入歷史K線</h3>
+<p>直接從indicator set調用EWMA指標，不用填參數收盤價，只要填IW參數<br>
+而且也會自動載入歷史K線資料<br>
+pkg/bbgo/indicator_set.go裡可以發現，自動幫我們從indicator set取收盤價再給到EWMA2()函數<br>
+ewma.Length(): 1001，會從1001開始</p>
+<p>在Run()</p>
+<pre><code>ewma := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Window: s.Window, Interval: s.Interval})
+ewma.OnUpdate(func(value float64) {
+	// OnUpdate() will trigger only when there is a new ewma value coming in
+	fmt.Println("ewma:", value, "ewma.Length():", ewma.Length())
+})
+</code></pre>
+<p>輸出結果：</p>
+<pre><code>ewma: 45332.44338652186 ewma.Length(): 1001
+ewma: 45331.87349061723 ewma.Length(): 1002
+ewma: 45332.27326541612 ewma.Length(): 1003
+......
+
+ewma: 47315.94491898337 ewma.Length(): 1285
+ewma: 47305.64911775864 ewma.Length(): 1286
+ewma: 47291.935626290346 ewma.Length(): 1287
+</code></pre>
+<blockquote>
+<p>Written with <a href="https://stackedit.io/">StackEdit</a>.</p>
+</blockquote>
+</div>
+</body>
+
+</html>

@@ -1,0 +1,18 @@
+pkg/strategy/scmaker/strategy.go
+
+scmaker策略如何preload Kline與取指標計算值
+
+
+Run()裡	s.initializeMidPriceEMA(session)
+
+
+而initializeMidPriceEMA(session)會去preload Kline
+
+
+要用到midPriceEMA時，是直接用s.ewma.Last(0)去拿指標算出的最後一個值
+	midPriceEMA := s.ewma.Last(0)
+
+
+
+完全沒用到OnUpdate()欸
+

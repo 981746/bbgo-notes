@@ -1,0 +1,28 @@
+複習map—小結：
+
+
+雖然我在複習map，但花了比較多時間在make()上
+
+一、第一個例子用make()來初始化一個空的map
+  session := &ExchangeSession{
+............
+    marketDataStores:      make(map[string]*MarketDataStore),
+    standardIndicatorSets: make(map[string]*StandardIndicatorSet),
+.............
+  }
+
+二、第二個例子用make()來初始化特定類型的slice且註明size大小
+再把slice切段copy過去
+不能直接s := slice[:depth]嗎？？？
+
+答案是：不行
+slicing operation給出的小段，還是會指向原本slice的那一小段
+所以改新的小段內容，會影響到原本的slice的那一小段
+
+真的只能用make()+built-in copy()，來做slice的複製，並複製給新的slice
+這樣新的slice去改值才不會去影響到原本的slice
+
+三、「其實go缺的可多了 比方沒有set我們只好拿map來平替🤣」
+這個問題有興趣再去研究，現在有個印象就好
+
+_golang_複習_map

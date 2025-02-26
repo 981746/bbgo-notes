@@ -1,0 +1,208 @@
+Maps and Structs
+
+/////////////////////////////////////Maps
+*map：key - value配對的結構
+map one key type to one value type
+map關鍵字後，先[key類型]value類型，{}裡面填值。然後結尾有一個逗號XD
+舉例：
+statePopulations := map[string]int{ key : value, key : value, ........key : value, }
+
+golang的map結構有點奇妙ㄟ
+  statePopulations := map[string]int{
+    "California":   3925017,
+    "Texas":        27862596,
+    "Florida":      20612439,
+    "New York":     19745289,
+    "Pennsylvania": 12802503,
+    "Illinois":     12801539,
+    "Ohio":         11614373,
+  }
+
+"Ohio":         11614373,
+這一筆已經是結尾最後一個了，value的部分居然還要寫逗號
+
+
+*an array is a valid key type but the slice is not
+array可以作為key type，但slice不行
+//怎麼會有這奇怪的想法，想用array做key type啊？好妙喔，我從來沒這樣想過XD
+
+*用make()來宣告一個map，之後再給值
+  statePopulations := make(map[string]int)
+  statePopulations = map[string]int{
+    "California":   3925017,
+    "Texas":        27862596,
+    "Florida":      20612439,
+    "New York":     19745289,
+    "Pennsylvania": 12802503,
+    "Illinois":     12801539,
+    "Ohio":         11614373,
+  }
+*以map的key來取值
+statePopulations["Ohio"]
+
+*對map增加一個新的key-value配對
+statePopulations["Georgia"] = 10310371
+
+*對map增加了一個key-value配對後，發現map裡元素的順序變得不一樣了
+所以map裡元素的順序，並沒有保證會跟我們新增元素的順序一致
+
+*刪除map裡的一個key-value配對
+我們用key來刪除整個key-value配對
+  delete(statePopulations, "Georgia")
+
+*假設我們以一個不存在的key，去存取map裡根本不存在的key-value配對
+這樣會發生甚麼事？我們會得到0
+所以這樣會有點問題啊，到底是有這個key，但是值為0；還是沒有這個key，所以返回0；還是我們打錯字了？
+golang的map的這個特性，很容易誤導人吧，為何要這樣設計XD
+
+*golang有一個方法可以檢查在map裡，這個key是不是有這個key存在
+舉例：//"ddc" key不存在，所以結果會回傳false，但這個語法超奇怪........
+pop1, ok := statePopulations["ddc"]
+fmt.Println(pop1, ok)
+這個叫comma ok syntax
+
+
+*剛剛comma ok syntax會先印那個key的值，然後才是true or false
+但是我們只想知道那個key存不存在，true or false?那要怎麼寫？
+答案是：底線+逗號+ok，最後印的時候印ok就好，ok變數裡面會存true or false
+舉例：
+_, ok := statePopulations["ddc"]
+  fmt.Println(ok)
+
+*用len()可以得知一個map的length
+  fmt.Println(len(statePopulations))
+
+*把map指給另一個變數，參照的方式是reference type
+跟slice一樣
+所以要小心，刪一個map裡的內容，也會改到另一個map的內容
+因為兩個map根本指向同一份資料
+
+
+
+/////////////////////////////////////Structs
+*我怎麼覺得這個struct
+很像自己去訂一個比較完整的json結構
+就是某個東西，他的屬性、參數都很確定了，然後為他去訂一個結構
+或是說這個struct有點像java的物件
+
+*然後struct給值的時候，跟map一樣
+最後也是會留一個逗號
+  aDoctor := Doctor{
+    number:3,
+    actorName: "Jon Pertwee",
+    companions: []string{"Liz Shaw","Jo Grant","Sarash Jane Smith"},
+  }
+
+
+*第一個struct範例
+先在package層定義一個struct結構
+而後才在main()裡去給值
+然後以屬性名稱來給值時，並不一定要照定義時的順序
+如果不註明屬性名稱來給值，就一定要要照順序
+
+*也可以用struct結構，去拿裡面某個屬性的值
+舉例：
+aDoctor是一個struct，我們想知道屬性actorName的值為何
+aDoctor.actorName
+
+*struct裡的companions屬性為slice
+那我們要那個slice裡的某個元素
+  aDoctor := Doctor{
+    number:     3,
+    actorName:  "Jon Pertwee",
+    companions: []string{"Liz Shaw", "Jo Grant", "Sarash Jane Smith"},
+  }
+  fmt.Println(aDoctor.companions[1])
+我真的覺得這真的跟json，根本一樣阿
+
+
+*按著struct定義時的順序
+我們給值的時候不特別註明屬性名稱
+這樣也是可以的
+但不建議這樣使用
+  aDoctor := Doctor{
+    3,
+    "Jon Pertwee",
+    []string{"Liz Shaw", "Jo Grant", "Sarash Jane Smith"},
+  }
+
+  fmt.Println(aDoctor)
+
+*struct的變數名稱與其他變數一樣，大寫就是其他package可以存取，小寫就是在這個package可以存取
+欸
+這個是填在struct裡的屬性名稱，大小寫也要一起改
+舉例：// Number ActorName Companions都是大寫開頭
+type Doctor struct {
+  Number     int
+  ActorName  string
+  Companions []string
+}
+
+*還有一個東西叫匿名struct
+在package層，不用去先定義struct名稱與其結構
+而是直接在main()就可以直接宣告與給值
+
+方法為：
+在struct關鍵字後，第一個{}是定義struct結構，第二個{}是用來給值
+aDoctor := struct{ name string }{name: "John Pertwee"}
+
+匿名struct，主要作為一次性使用，生命周期較短
+
+*把struct指給另外一個變數
+這兩個struct會是各自獨立的
+去改值並不會互相影響
+
+我記得map與slice都是reference type
+所以struct這個特性又與map跟slice不一樣
+
+
+*把struct指給另外一個變數
+那如果你希望兩個變數指向同一個struct
+可以用&這個符號
+anotherDoctor := &aDoctor
+
+*golang 沒有繼承這件事，那要怎麼辦？
+有一個類似繼承的概念叫做composition
+透過embedding來達成composition，但composition也不是繼承
+是一起組成的概念而不是屬於的概念
+
+*我們現在有兩個struct，Animal與Bird
+這兩個struct目前是完全沒有任何關係
+
+然後好像是讓Bird embed Animal struct
+換句話說就是，讓"小鳥"嵌入"動物"struct的相關屬性
+然後我們可以看到結果為：{{Emu Australia} 48 false}
+
+整個Bird struct 鑲嵌了{Emu Australia}，也就是鑲嵌的Animal struct
+所以擁有了Animal struct的相關屬性，Name與Origin，對應的值為Emu與Australia
+當然還是保留自己Bird struct原本的屬性SpeedKPH與Canfly，對應的值為48與false
+
+*然後我們可以存取Bird與Animal struct的相關屬性
+
+*照這樣的鑲嵌邏輯來定義整個Bird struct
+其實邏輯是這樣：
+小鳥並不屬於動物
+而是小鳥既是小鳥又是動物
+
+因為如果你去檢查小鳥與動物是不是同一個type，答案為不是！
+那如果你去檢查小鳥是否"擁有"動物這一個type，答案為是！
+
+*另一個幫Bird struct給值的方式是
+連裡面Animal struct都要按照屬性與值這樣的格式填值
+  b := Bird{
+    Animal:   Animal{Name: "Emu", Origin: "Australia"},
+    SpeedKPH: 48,
+    CanFly:   false,
+  }
+
+而一般的方式：//就好像bird擁有了bird與animal的相關屬性，不用特別說明那個屬性是bird的還是animal的
+  b := Bird{}
+  b.Name = "Emu"
+  b.Origin = "Australia"
+  b.SpeedKPH = 48
+  b.CanFly = false
+
+*再來是Tag的概念
+然後要拿到tag這項資訊，要用golang內建的lib叫reflect
+這個例子的語法，對我來說，莫名其妙阿XDDD 長得好奇怪喔
+(不舉例了，程式碼太長，有需要再回來看)

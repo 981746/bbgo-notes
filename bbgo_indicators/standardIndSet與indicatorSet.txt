@@ -1,0 +1,58 @@
+在standard indicator set的指標有：
+1. SMA - PushK、BindK、LoadK
+2. EWMA - PushK
+3. VWMA - PushK、handleKLineWindowUpdate、Bind、CalculateAndUpdate
+4. PivotHigh - PushK
+5. PivotLow - PushK
+6. ATR - PushK
+7. ATRP - PushK、handleKLineWindowUpdate、Bind、CalculateAndUpdate
+8. EMV - PushK
+9. CCI - PushK、CalculateAndUpdate
+10. HULL - PushK
+11. STOCH - PushK
+12. BOLL - PushK、BindK、LoadK、CalculateAndUpdate、handleKLineWindowUpdate、Bind
+13. MACD - PushK
+14. RSI - PushK、CalculateAndUpdate、handleKLineWindowUpdate、Bind
+15. GHFilter - PushK
+16. KalmanFilter - PushK
+看起來PushK是必要的，其他不一定
+
+
+
+在indicator_set.go的指標有：
+1. OPEN 
+2. HIGH
+3. LOW
+4. CLOSE
+5. VOLUME
+6. RSI 直接用float64 series的Bind()
+7. EMA 
+8. EWMA 直接用float64 series的Bind()
+9. STOCH 沒用到float64 series的Bind()
+10. BOLL 直接用float64 series的Bind()
+11. MACD 沒用到float64 series的Bind()，用別的指標計算就算出來了...
+12. ATR 沒用到float64 series的Bind()，用別的指標計算就算出來了...
+13. ATRP 沒用到float64 series的Bind()
+
+v2版本的指標內，都沒有任何舊版會出現的：
+PushK、BindK、LoadK、CalculateAndUpdate、handleKLineWindowUpdate、Bind
+
+
+舊版的ATR指標只有PushK
+舊版的SMA指標有PushK、BindK、LoadK
+舊版指標載入K線資料的行為不一致，可能因為開發是慢慢演進的
+有的用以前的方法，有的用新的方法
+所以比較亂
+
+在standard indicator set裡，到底用到了哪個？
+確定在standard indicator set裡的指標，只要實作PushK()方法就可以了
+但是這樣就一定要經由StandardIndicatorSet來調用指標
+
+如果不想經由StandardIndicatorSet來調用指標，有兩種方式
+1.CalculateAndUpdate + handleKLineWindowUpdate + Bind
+但這個方法指標舊資料在第一次OnUpdate()時，會一次全部出現
+2.PushK() + BindK + LoadK
+此方法在在第一次OnUpdate()時，只會出現當次的指標值
+
+
+

@@ -1,0 +1,386 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>12.(IndV2NotIndSet)客製CustomCross v2指標</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h2 id="indv2notindset客製customcross-v2指標">(IndV2NotIndSet)客製CustomCross v2指標</h2>
+<h3 id="章節">章節</h3>
+<ul>
+<li>
+<p>為什麼要客製一個Cross指標，不是官方本來就有Cross指標了嗎？</p>
+<p>後來發現，其實原本的Cross指標在策略檔多寫一點東西，還是可以達成在一個收盤K線判斷是上穿還是下穿的判斷，但因為這樣的方式還需要把狀態值重設為0，其實很容易忘記，我覺得會容易有疏忽</p>
+</li>
+<li>
+<p>那bbgo專案是如何使用Cross指標的？</p>
+</li>
+<li>
+<p>新建一個CustomCross指標，基本上照抄BBGO v2的Cross指標，只有做以下改動</p>
+</li>
+<li>
+<p>我直接放程式碼吧，有好幾種使用方式，策略檔註解上寫得很清楚了</p>
+</li>
+</ul>
+<h3 id="為什麼要客製一個cross指標，不是官方本來就有cross指標了嗎？">為什麼要客製一個Cross指標，不是官方本來就有Cross指標了嗎？</h3>
+<ol>
+<li>
+<p>v2的Cross()，不能在OnKLineClosed，直接用Last(i)取值</p>
+<p>直接使用fmt.Println("CrossOverUnder: ", CrossOverUnder.Last(0))<br>
+這樣就算沒有發生上穿或下穿，會拿的是上次的上穿或下穿結果值…<br>
+要使用OnUpdate()才能正常判斷</p>
+<p>Q：怎麼感覺這個行為不就跟price above below ma一樣了？！)<br>
+嗯…真的一樣剛剛去跑跑看程式對照<br>
+用Last(i)在OnKLineClosed取值，前面的幾個指標值為0<br>
+可能是因為官方Cross指標一開始尚未計算出來的問題，所以那個0其實	是預設會給一個值吧<br>
+用自己寫的PriceAboveBelowMA2()不會有前面幾個指標值為0的問題</p>
+<p>調查：<br>
+(這樣我就有點好奇指標結果的slice是怎麼push的，假設前面幾個算不出值，直接return，後面算出值了，會從slice第一個位置push還是從後面所對的index開始push資料？)<br>
+(要查這個檔案pkg/types/series_float64.go)</p>
+<p>在指標檔內有使用Bind()的話<br>
+應該是事件發生<br>
+會去呼叫大寫的Calculate(x)<br>
+與PushAndEmit(y)</p>
+<p>但是官方的Cross()並沒有用到Bind()<br>
+方式不太一樣，感覺只是在指標檔手動去PushAndEmit</p>
+<p>我現在覺得比較疑惑的是，Cross()裡的這兩個OnUpdate()會同時更新喔？</p>
+<pre><code>a.OnUpdate(func(v float64) {
+	s.a.Push(v)
+	s.calculate()
+})
+b.OnUpdate(func(v float64) {
+	s.b.Push(v)
+	s.calculate()
+})	
+</code></pre>
+<p>沒事，在calculate()有處理兩個slice長度要一致</p>
+<pre><code>if s.a.Length() != s.b.Length() {
+	return
+}
+</code></pre>
+<p>感覺好像是因為傳進去的兩個stream與算出的指標值slice的length不一致<br>
+在前面幾筆資料時指標值slice，尚未新增任何值<br>
+這個時候在OnKLineClosed()去拿資料，就會拿到0吧…</p>
+<p>喔，跑完一個回測 兩個stream slice的長度為23，指標值slice長度為20</p>
+<pre><code>isCross.Last(0):  0
+s.a.Length():  22
+s.b.Length():  23
+s.Slice.Length():  20
+s.a.Last(0):  43994.93
+s.b.Last(0):  43667.38446041593
+s.a.Length():  23
+s.b.Length():  23
+s.Slice.Length():  20
+s.a.Last(0):  43949.44
+s.b.Last(0):  43667.38446041593
+Push and Emit
+</code></pre>
+<p>然後在OnKLineClosed拿到23次指標值<br>
+那表示前面3次的值為0，其實代表的是沒有值…</p>
+<pre><code>isCross.Last(0):  0
+isCross.Last(0):  0
+isCross.Last(0):  0
+isCross.Last(0):  1
+isCross.Last(0):  0
+isCross.Last(0):  -1
+isCross.Last(0):  1
+isCross.Last(0):  0
+isCross.Last(0):  0
+isCross.Last(0):  0
+isCross.Last(0):  0
+isCross.Last(0):  0
+isCross.Last(0):  0
+isCross.Last(0):  0
+isCross.Last(0):  -1
+isCross.Last(0):  1
+isCross.Last(0):  0
+isCross.Last(0):  -1
+isCross.Last(0):  0
+isCross.Last(0):  0
+isCross.Last(0):  1
+isCross.Last(0):  0
+isCross.Last(0):  0
+</code></pre>
+<p>用OnUpdate()拿指標值，是21筆資料，多了一個值<br>
+看起來不管是官方的指標，還是自己寫的指標，都要注意這個問題<br>
+要怎麼處理呢？<br>
+感覺牽扯到其他兩個資料流、以及計算邏輯都有可能產生這個問題<br>
+所以難怪官方的Cross()目前在OnUpdate()調用，以及只拿1與-1來判斷</p>
+<p>我覺得我的CustomCross()，本來是用0來代表價格與MA相等<br>
+現在應該要換一個數字<br>
+要不然會有問題<br>
+或是在指標檔加一個boolean slice，作為是否發生cross的標記<br>
+最後決定用boolean的方式作為穿越的標記</p>
+</li>
+</ol>
+<h3 id="那bbgo專案是如何使用cross指標的？">那bbgo專案是如何使用Cross指標的？</h3>
+<ol>
+<li>
+<p>bollmaker策略有用到cross()<br>
+在func (s *Strategy) Run(</p>
+<pre><code>s.EMACrossSetting.cross.OnUpdate(func(v float64) {
+  switch indicatorv2.CrossType(v) {
+  case indicatorv2.CrossOver:
+    s.shouldBuy = true
+  case indicatorv2.CrossUnder:
+    s.shouldBuy = false
+    // TODO: can partially close position when necessary
+    // s.orderExecutor.ClosePosition(ctx)
+  }
+})
+</code></pre>
+</li>
+<li>
+<p>在placeOrders()裡面再拿shouldBuy，來確認是否要買。在OnKLineClosed()會去調用placeOrders()</p>
+</li>
+<li>
+<p>整個思考方式與我想要的不太一樣<br>
+c9s這個等於是上穿的話，就可以買<br>
+這個可以買的狀態就一直維持，直到下穿發生變成不能買</p>
+</li>
+<li>
+<p>而我想做的是<br>
+在每一根K棒去確認價格是否有cross ma<br>
+有(上穿)、有(下穿)、沒有</p>
+<p>所以我想要的方式還是要自己另外取寫一個客製化的customCross()指標</p>
+</li>
+</ol>
+<h3 id="新建一個customcross指標，基本上照抄bbgo-v2的cross指標，只有做以下改動">新建一個CustomCross指標，基本上照抄BBGO v2的Cross指標，只有做以下改動</h3>
+<ol>
+<li>
+<p>在指標struct增加一個boolean slice</p>
+<pre><code>type CustomCrossStream struct {
+............
+	IsCross bools.BoolSlice
+</code></pre>
+</li>
+<li>
+<p>在calculate()</p>
+<pre><code>if current*previous &lt; 0 {
+
+	s.IsCross.Push(true)// 發生穿越push true to IsCross
+	if current &gt; 0 {
+		s.PushAndEmit(float64(CustomCrossOver))
+	} else {
+		s.PushAndEmit(float64(CustomCrossUnder))
+	}
+} else {
+	s.IsCross.Push(false)// 沒發生穿越push false to IsCross
+}
+</code></pre>
+</li>
+</ol>
+<h3 id="我直接放程式碼吧，有好幾種使用方式，策略檔註解上寫得很清楚了">我直接放程式碼吧，有好幾種使用方式，策略檔註解上寫得很清楚了</h3>
+<h4 id="策略檔完整程式碼">策略檔完整程式碼</h4>
+<pre><code>package getIndV2NotIndSet
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
+	. "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+const ID = "getIndV2NotIndSet"
+
+func init() {
+	// Register our struct type to BBGO
+	// Note that you don't need to field the fields.
+	// BBGO uses reflect to parse your type information.
+	bbgo.RegisterStrategy(ID, &amp;Strategy{})
+}
+
+type Strategy struct {
+	Symbol   string         `json:"symbol"`
+	Interval types.Interval `json:"interval"`
+	Window   int            `json:"window"`
+
+	isPriceCrossMa int
+}
+
+func (s *Strategy) ID() string {
+	return ID
+}
+
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s:%s", ID, s.Symbol, s.Interval)
+}
+
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "5m"})
+
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+
+	// 客製CustomCross v2指標
+	price := session.Indicators(s.Symbol).CLOSE(types.Interval(s.Interval))
+	ma := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.Window})
+	CrossInd := CustomCross(price, ma)
+	CrossInd.OnUpdate(func(v float64) {
+		// 這邊是只有發生上穿或下穿才會推播
+		// v can be 1.0, -1.0
+		// fmt.Println("發生穿越：", CrossInd.IsCross.Last()) // this is always true in OnUpdate()
+		// fmt.Println("CustomCross: ", v)
+
+		if v == 1.0 {
+			s.isPriceCrossMa = 1
+		} else if v == -1.0 {
+			s.isPriceCrossMa = -1
+		}
+
+	})
+	count := 0
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+
+		count++
+
+		// 1.這個是bbgo官方使用Cross的方式，s.isPriceCrossMa值有可能會是0喔，因為前面幾筆資料尚未推播指標值
+		// 他這個方式是上穿了，如果還沒下穿，s.isPriceCrossMa值就一直是1，就會一直買
+		// 這樣的方式在CrossInd.OnUpdate()裡面要先把1 或 -1的值存起來，才能在這邊判斷
+		// fmt.Println(count, ". 是否發生穿越：", s.isPriceCrossMa)
+
+		// 2.其實如果用原版的Cross()，可以這樣寫
+		// 這樣也能判斷此根收盤K棒是否發生穿越
+		// 這樣的方式在CrossInd.OnUpdate()裡面要先把1 或 -1的值存起來，才能在這邊判斷
+		if s.isPriceCrossMa == 1 || s.isPriceCrossMa == -1 {
+			if s.isPriceCrossMa == 1 {
+				fmt.Println(count, ". 發生穿越-上穿")
+
+			} else if s.isPriceCrossMa == -1 {
+				fmt.Println(count, ". 發生穿越-下穿")
+
+			}
+			s.isPriceCrossMa = 0
+		} else {
+			fmt.Println(count, ". 沒有發生穿越")
+		}
+
+		// 3.印出相關資訊，Debug用
+		// 如果CrossInd.Last(0)的值為0，代表指標值還沒有計算出來，無法判斷價格與均線狀況
+		// fmt.Println(count, ". 是否發生穿越：", CrossInd.IsCross.Last())
+		// fmt.Println("CrossInd.Last(0): ", CrossInd.Last(0))
+		// fmt.Println()
+
+		// 4.要判斷此根收盤K棒是否發生穿越，發生上穿還是下穿請用以下方式(使用指標內的IsCross boolean slice)
+		// fmt.Println(count, ".")
+		// if CrossInd.IsCross.Last() { // 此根收盤K棒是否發生穿越
+		// 	if CrossInd.Last(0) == 1.0 {
+		// 		fmt.Println("發生CrossOver")
+		// 	} else if CrossInd.Last(0) == -1.0 {
+		// 		fmt.Println("發生CrossUnder")
+		// 	}
+		// }
+
+	}))
+	return nil
+}
+</code></pre>
+<h4 id="指標檔完整程式碼">指標檔完整程式碼</h4>
+<pre><code>package indicatorv2
+
+import (
+	"github.com/c9s/bbgo/pkg/datatype/bools"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+type CustomCrossType float64
+
+const (
+	CustomCrossOver  CustomCrossType = 1.0
+	CustomCrossUnder CustomCrossType = -1.0
+)
+
+// CrossStream subscribes 2 upstreams, and calculate the cross signal
+type CustomCrossStream struct {
+	*types.Float64Series
+
+	a, b    floats.Slice
+	IsCross bools.BoolSlice
+}
+
+// Cross creates the CrossStream object:
+//
+// cross := Cross(fastEWMA, slowEWMA)
+func CustomCross(a, b types.Float64Source) *CustomCrossStream {
+	s := &amp;CustomCrossStream{
+		Float64Series: types.NewFloat64Series(),
+	}
+	a.OnUpdate(func(v float64) {
+		s.a.Push(v)
+		s.calculate()
+	})
+	b.OnUpdate(func(v float64) {
+		s.b.Push(v)
+		s.calculate()
+	})
+	return s
+}
+
+func (s *CustomCrossStream) calculate() {
+
+	if s.a.Length() != s.b.Length() {
+		return
+	}
+
+	current := s.a.Last(0) - s.b.Last(0)
+	previous := s.a.Last(1) - s.b.Last(1)
+
+	if previous == 0.0 {
+		return
+	}
+
+	// cross over or cross under
+	if current*previous &lt; 0 {
+
+		s.IsCross.Push(true)
+		if current &gt; 0 {
+			s.PushAndEmit(float64(CustomCrossOver))
+		} else {
+			s.PushAndEmit(float64(CustomCrossUnder))
+		}
+	} else {
+		s.IsCross.Push(false)
+	}
+
+}
+</code></pre>
+<h4 id="yaml檔">yaml檔</h4>
+<pre><code>exchangeStrategies:
+- on: binance
+  getIndV2NotIndSet:
+    symbol: BTCUSDT
+    interval: 5m
+    window: 60
+      
+backtest:
+  startTime: "2023-12-21"
+  endTime: "2023-12-22"
+  symbols:
+  - BTCUSDT
+  - DOGEUSDT
+  sessions: [binance]
+  # syncSecKLines: true
+  accounts:
+    binance:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 0.0
+        USDT: 10_000.0
+</code></pre>
+<blockquote>
+<p>Written with <a href="https://stackedit.io/">StackEdit</a>.</p>
+</blockquote>
+</div>
+</body>
+
+</html>

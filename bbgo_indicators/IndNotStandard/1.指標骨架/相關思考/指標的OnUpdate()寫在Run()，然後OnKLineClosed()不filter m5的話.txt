@@ -1,0 +1,51 @@
+指標的OnUpdate()寫在Run()，然後OnKLineClosed()不filter m5的話
+
+程式碼：
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+
+	priceCrossMaiw := types.IntervalWindow{Window: 20, Interval: s.Interval}
+	s.priceCrossMa = &indicator.PriceCrossMa{IntervalWindow: priceCrossMaiw}
+
+	symbol := s.Symbol
+	store, _ := session.MarketDataStore(symbol)
+	s.priceCrossMa.Bind(store)
+
+	s.priceCrossMa.OnUpdate(func(v float64) {
+		fmt.Println("priceCrossMa: ", v)
+	})
+	session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
+		// session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+		fmt.Println(k, "End of m5 data")
+	})
+	return nil
+}
+
+
+輸出結果：
+{129550 binance BTCUSDT 2022-02-28 23:10:00 +0000 UTC 2022-02-28 23:10:59.999 +0000 UTC 1m 43154.76 43194.83 43200 43154.75 41.11243 1775303.0275546 14.50714 626398.1928839 0 0 true} End of m5 data
+priceCrossMa:  21601.05
+{129551 binance BTCUSDT 2022-02-28 23:11:00 +0000 UTC 2022-02-28 23:11:59.999 +0000 UTC 1m 43194.83 43202.1 43232.37 43189.27 47.30981 2044551.8947324 20.59216 889927.6705226 0 0 true} End of m5 data
+priceCrossMa:  21638.86
+{129552 binance BTCUSDT 2022-02-28 23:12:00 +0000 UTC 2022-02-28 23:12:59.999 +0000 UTC 1m 43202.09 43277.72 43318.84 43158.4 91.24253 3944596.1139632 47.22214 2041836.7361425 0 0 true} End of m5 data
+priceCrossMa:  21622.175
+{129553 binance BTCUSDT 2022-02-28 23:13:00 +0000 UTC 2022-02-28 23:13:59.999 +0000 UTC 1m 43277.73 43244.35 43285.33 43240.38 41.39497 1790630.5665607 19.51583 844230.8574791 0 0 true} End of m5 data
+priceCrossMa:  21634.775
+{129554 binance BTCUSDT 2022-02-28 23:14:00 +0000 UTC 2022-02-28 23:14:59.999 +0000 UTC 1m 43244.34 43269.55 43275.27 43227.56 28.56686 1235661.8800345 15.88078 686963.2857285 0 0 true} End of m5 data
+priceCrossMa:  21634.775
+{155510 binance BTCUSDT 2022-02-28 23:10:00 +0000 UTC 2022-02-28 23:14:59.999 +0000 UTC 5m 43154.76 43269.55 43318.84 43154.75 249.6266 10790743.4828454 117.71805 5089356.7427566 0 0 true} End of m5 data
+
+
+
+所以是
+1m
+1m
+1m
+1m
+1m(第五分鐘)
+5m(第五分鐘)
+
+所以priceCrossMa會在1m的第五分鐘與5m的資料點，算出一樣的值
+
+
+
+

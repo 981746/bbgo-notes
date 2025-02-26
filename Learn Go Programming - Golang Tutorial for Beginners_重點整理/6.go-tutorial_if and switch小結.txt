@@ -1,0 +1,231 @@
+If and Switch Statements小結
+
+
+/////////////////////////////////////////////////////////////If
+
+*golang的if語法居然沒有括號，還真簡略啊
+ if true {
+    fmt.Println("The test is true")
+  }
+
+*就算if之後接的敘述只有一行程式碼
+也一定要有curly braces，不能省略
+
+*現在講一個概念叫
+initializer syntax，宣告與給值後，運用分號拿到boolean變數
+
+居然可以把「宣告與給值」放進if判斷裡
+然後可以拿到兩個結果，一個是key的值，一個是這個key是否存在的boolean變數
+然後這兩個結果，key的值與boolean的生命週期只存在於這個if中
+哦 好有趣XD
+
+if pop, ok := statePopulations["Florida"]; ok {
+    fmt.Println(pop)
+  }
+
+*猜數字遊戲，判斷數字的大於、等於、小於
+這個例子簡單到沒什麼好說的
+
+*再來是判斷兩個數字，小於等於、大於等於、不等於
+我覺得比較有趣的反而是fmt.Println()這個function的使用欸
+居然直接用逗號隔開不同的判斷結果，滿有趣的
+fmt.Println(number <= guess, number >= guess, number != guess)
+
+*所以小結一下：
+數值的話可以用
+大於、等於、小於
+小於等於、大於等於、不等於
+這六個operator
+
+*字串的話或reference type的判斷(map、slice是否為同一個)，可以用"等於"或"不等於"這兩個operator
+
+*可以用logical operator把多個判斷寫在一起，也就是or 或 and
+用的符號是||、&&
+
+*邏輯運算還有一個是not operator，符號為驚嘆號
+舉例：
+fmt.Println(!true)//這樣會印false
+
+*多個判斷用or連接時
+假設第一個判斷結果為true，程式其實就進去if裡了
+而不會去執行其他的判斷
+這個概念叫Short circuiting
+
+*兩個判斷用and連接
+如果第一個判斷為false，程式就直接進去if裡
+而不會去執行其他判斷
+這個也是Short circuiting
+
+*if else也適用於Short circuiting概念
+然後if else也是跟多個判斷類似的邏輯
+假設第一個if成立，程式就是進入第一個if中
+其他的else if 與else其實都不會執行到
+所以這個例子在else if又寫了一次if guess < 1沒有意義
+因為只要if guess < 1，在第一個if就為true，就去執行if裡的東西，而不會跑到其他的狀況
+  if guess < 1 {
+    
+  }
+  else if guess <1 || > 100{
+
+
+  }
+  else{
+
+
+
+  }
+
+*golang的else與else if語法
+看起來跟其他語言沒兩樣XD
+舉例：//完整程式碼我懶得打，就這樣吧
+  if guess < 1 {
+  }
+  else if guess > 100{
+
+
+  }
+  else{
+
+
+    
+  }
+
+*兩個float數值的比較要特別注意
+
+*把myNum開根號，再平方回去
+然後再去比較myNum與做過數學運算的myNum是否是一樣的數值
+這個例子的結果說，他們是一樣的數字
+這個例子的myNum是0.1
+
+
+*同樣的程式碼，但是myNum改成0.123
+挖～結果卻說myNum與「myNum開根號，再平方」是不一樣的數字
+為什麼呢？
+我們直接把結果印出來看
+  fmt.Println(math.Pow(math.Sqrt(myNum), 2))
+結果為
+0.12299999999999998
+
+因為0.123與0.12299999999999998，不一樣，所以go說這不是一樣的數字
+所以做浮點數運算，有可能算出來是個近似值
+那就會導致結果不是我們預期的，所以要特別注意
+
+
+*那要怎麼比較兩個float呢？
+影片的做法為
+把兩個數值相除再減一，再取絕對值，再看結果是否小於0.001
+//嗯？這甚麼奇怪的方法XD
+
+意思是
+在上一個例子裡，結果算出來是0.12299999999999998
+0.123 與 0.12299999999999998
+那0.123/0.12299999999999998 = 1.0000000000000001626016260162602
+然後減1
+1.0000000000000001626016260162602 - 1 = 0.0000000000000001626016260162602
+
+這個值是否小於0.001
+沒錯
+所以我們可以說這兩個float是相同的值
+
+/////////////////////////////////////////////////////////////Switch
+*第一個switch例子，非常簡單啊
+  switch 2 {
+  case 1:
+    fmt.Println("one")
+  case 2:
+    fmt.Println("two")
+
+  default:
+    fmt.Println("not one or two")
+
+  }
+
+*還可以在一個case裡列舉多個比較值
+只要符合其中一個，就會進來這個case中
+舉例：
+  case 1, 5, 10:
+    fmt.Println("one, five or ten")
+
+*switch居然還可以加入counter，i
+這個例子是
+i := 2+3;i
+做一個運算把值給i，然後再加一個分號，指名我們要比較的是i
+
+整段程式碼：
+  switch i := 2 + 3; i {
+  case 1, 5, 10:
+    fmt.Println("one, five or ten")
+  case 2, 4, 6:
+    fmt.Println("two, four or six")
+
+  default:
+    fmt.Println("another number")
+
+  }
+
+要注意的是
+兩個case列舉的值
+1 5 10
+2 4 6
+不能重複
+
+*更酷的是
+用counter去比較數值，居然可以寫在case中
+然後switch的地方沒有訂條件，而是把i :=10 寫在switch之外
+//總覺得我不太會用到switch，我覺得這些東西我一般都用if來處理
+
+這個例子還有一點要注意
+i <= 10
+i <= 20
+假設i等於9
+那兩個case的值，其實重複了欸
+所以這種寫法是允許重複的
+上個switch例子，數值用列舉的方式，兩個case的數值就不允許重複
+
+
+*golang的swtich的每一個case
+其實都隱含了break
+所以在go語言，我們並不需要特別去寫出break這個關鍵字
+因為go語言已經幫我們做掉這一塊，防止我們自己忘記加break
+
+*如果i 等於9
+i就直接進入到第一個case中，而不會進入第二個case
+如果我們也想要讓i == 9進入第二個case中
+我們可以用fallthrough這個關鍵字
+
+我知道了，因為go語言在每一個case隱含了break關鍵字
+那如果我們不想要break
+就要用fallthrough這個關鍵字
+
+
+*fallthrough這個關鍵字好危險喔
+就算第二個case的判斷不成立，還是會進入到case裡去執行程式碼
+所以fallthrough等於強制進入下一個case去執行程式碼
+
+*接下來要講switch的特別用法
+叫type switch
+
+*用interface，這樣就可以接任何的type//這個介面先不定義類型
+然後我們把值assign給這個介面
+接著switch就可以幫我們去判斷
+我們的值到底是甚麼類型
+滿有趣的XD
+  var i interface{} = 1
+  switch i.(type) {
+  case int:
+    fmt.Println("i is an int")
+  case float64:
+    fmt.Println("i is a float64")
+  case string:
+    fmt.Println("i is a string")
+  default:
+    fmt.Println("i is another type")
+  }
+
+*interface搭配switch，判斷是否為size = 3的int array
+在go語言中，array的size與型別要一致，才能被識別為一樣的data type
+
+*在case裡
+假設我們有一些邏輯做完，我們想提早結束這個case
+不想讓這個case裡的其他程式碼繼續跑
+我們其實可以用break這個關鍵字提早結束

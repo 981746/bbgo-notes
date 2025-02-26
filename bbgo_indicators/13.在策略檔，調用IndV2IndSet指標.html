@@ -1,0 +1,126 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>13.在策略檔，調用IndV2IndSet指標</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h2 id="在策略檔，調用indv2indset指標">在策略檔，調用IndV2IndSet指標</h2>
+<ul>
+<li>
+<p>策略名稱為getIndV2IndSet</p>
+</li>
+<li>
+<p>執行回測</p>
+<pre><code> go run ./cmd/bbgo backtest --sync --config ~/bbgo/config/getIndV2IndSet.yaml
+</code></pre>
+</li>
+</ul>
+<h3 id="因為策略檔上註解寫得非常清楚了，我就不多說明，直接看程式碼吧">因為策略檔上註解寫得非常清楚了，我就不多說明，直接看程式碼吧</h3>
+<h4 id="策略檔完整程式碼">策略檔完整程式碼</h4>
+<pre><code>package getIndV2IndSet
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
+	. "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+const ID = "getIndV2IndSet"
+
+func init() {
+	// Register our struct type to BBGO
+	// Note that you don't need to field the fields.
+	// BBGO uses reflect to parse your type information.
+	bbgo.RegisterStrategy(ID, &amp;Strategy{})
+}
+
+type Strategy struct {
+	Symbol   string         `json:"symbol"`
+	Interval types.Interval `json:"interval"`
+	Window   int            `json:"window"`
+
+	ewma *EWMAStream
+}
+
+func (s *Strategy) ID() string {
+	return ID
+}
+
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s:%s", ID, s.Symbol, s.Interval)
+}
+
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "5m"})
+
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+
+	// 從session取Indicators()，再呼叫EWMA()，代表用的是indicator set裡面的EWMA
+	// 也就是indicatorv2 package底下的EWMAStream
+	// 從indicator set調用指標並不用手動preload kline，bbgo會自動幫你preload
+	// 直接OnUpdate就可以拿到EWMA的值或是在OnKLineClosed()裡用Last(0)拿到最後一個指標值
+
+	// 方式一直接在Run()用column equial宣告一個ewma變數接指標實體
+	ewma := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.Window})
+	ewma.OnUpdate(func(v float64) {
+		// fmt.Println("EWMA - indicator set: ", v)
+	})
+
+	// 方式2，把ewma變數宣告在struct裡
+	// 這樣就可以在Run()用s.ewma接指標實體
+	s.ewma = session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.Window})
+	s.ewma.OnUpdate(func(v float64) {
+		// fmt.Println("EWMA - indicator set: ", v)
+	})
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+		// 方式一的ema.Last(0)
+		// fmt.Println("ewma.Last(0): ", ewma.Last(0))
+
+		// 方式二的s.ewma.Last(0)
+		fmt.Println("s.ewma.Last(0): ", s.ewma.Last(0))
+	}))
+	return nil
+}
+</code></pre>
+<h3 id="yaml檔">yaml檔</h3>
+<pre><code>exchangeStrategies:
+- on: binance
+  getIndV2IndSet:
+    symbol: BTCUSDT
+    interval: 5m
+    window: 60
+      
+backtest:
+  startTime: "2023-12-21"
+  endTime: "2023-12-22"
+  symbols:
+  - BTCUSDT
+  - DOGEUSDT
+  sessions: [binance]
+  # syncSecKLines: true
+  accounts:
+    binance:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 0.0
+        USDT: 10_000.0
+</code></pre>
+<blockquote>
+<p>Written with <a href="https://stackedit.io/">StackEdit</a>.</p>
+</blockquote>
+</div>
+</body>
+
+</html>

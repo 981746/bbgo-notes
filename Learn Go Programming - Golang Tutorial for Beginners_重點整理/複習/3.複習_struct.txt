@@ -1,0 +1,60 @@
+複習struct
+
+////有一點對我來講比較困擾的是
+在golang中我要特別去記憶一個資料類型是value type還是reference type
+為什麼golang要這樣設計啊？
+其他人不覺得困擾嗎？
+我問問看copilot
+
+
+1.struct是value type
+
+
+2.匿名struct，主要作為一次性使用，生命周期較短
+
+方法為：
+在struct關鍵字後，第一個{}是定義struct結構，第二個{}是用來給值
+aDoctor := struct{ name string }{name: "John Pertwee"}
+
+
+func main() {
+  aDoctor := struct{ name string }{name: "John Pertwee"}
+
+  fmt.Println(aDoctor)
+
+}
+
+3.因為struct是value type，想用指標的方式可以這樣做：
+aDoctor是一個struct，我們把他用指標的方式指給另外一個struct
+anotherDoctor := &aDoctor
+
+////接下來要談golang的embedding概念
+
+4.好像是讓Bird embed Animal struct
+換句話說就是，讓"小鳥"嵌入"動物"struct的相關屬性
+然後我們可以看到結果為：{{Emu Australia} 48 false}
+
+整個Bird struct 鑲嵌了{Emu Australia}，也就是鑲嵌的Animal struct
+所以擁有了Animal struct的相關屬性，Name與Origin，對應的值為Emu與Australia
+
+type Animal struct {
+  Name   string
+  Origin string
+}
+type Bird struct {
+  Animal
+  SpeedKPH float32
+  CanFly   bool
+}
+
+func main() {
+  b := Bird{}
+  b.Name = "Emu"
+  b.Origin = "Australia"
+  b.SpeedKPH = 48
+  b.CanFly = false
+  fmt.Println(b)
+
+}
+
+_golang_複習_struct

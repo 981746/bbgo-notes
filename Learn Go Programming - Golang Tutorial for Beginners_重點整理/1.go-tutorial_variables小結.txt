@@ -1,0 +1,58 @@
+影片//////53:16  對variable這個部分，做小結
+
+Variable Part Summary
+
+*Variable declaration
+1.var foo int //先宣告，後給值
+2.var foo int = 42//同時宣告與給值
+3.foo := 42 //使用 column equal operator宣告與給值，看起來更簡潔
+
+一般來說，我們會使用第三個方式
+除非編譯器告訴我們有類型的問題
+我們才需要去改成第二種方式
+
+第一種方式是可能弄for迴圈之類的才需要用的
+
+*Can't redeclare variables, but can shadow them
+
+"在同一個scope下，我們不能宣告一個變數後，又再重新宣告"
+
+除非是在一個更大的scope我們宣告一個變數後，而後我們可以在更大scope裡的小的區塊中，也就是function中
+重新宣告同一個變數名稱
+那這件事就叫做shadow
+
+*All variables must be used
+所有宣告過的變數，都必須被使用
+不能宣告後就丟在那
+編譯器會丟出錯誤
+
+*Visibility
+1.lower case first letter for package scope
+2.upper case first letter to export
+3.not private scope
+
+所以變數範圍有三種：
+1.在同一個package裡可以存取的變數：宣告在function()外、package中，必須小寫
+2.外部的package也可以存取的變數，宣告在function()外，package中，必須大寫
+3.在function()內才能存取的變數，宣告在function()內，使用小寫
+
+*Naming conventions
+1.pascal or camelCase
+    Capitalize acronyms(HTTP,URL)
+2.As short as reansionable
+    longer names for logner lives
+舉例來說，for loop的話，使用變數i來計數
+這個i只是為了在迴圈中使用，迴圈結束就沒用，所以名稱可以很簡短
+
+如果一個變數在function()中使用，那你就可以取一個更有意義的名稱
+那如果一個變數是在package層被使用，那名稱就可能會更長
+
+*Type conversions
+1.destination Type(variable)//目標類型 + () 就變成一個conversion function
+2.use strconv package for strings
+
+注意型別轉換，可能產生的資料遺失問題
+strconv.Itoa() //integer轉string
+strconv.Atoi() //string轉integer
+
+_go

@@ -1,0 +1,314 @@
+golang 介面複習
+
+*Basic
+*Composing interfaces
+(make interface of interface)
+*Type conversion
+  The empty interface
+  Type switches
+*Implementing interface with values vs. pointers
+*Best practices
+
+////////
+interfaces describe behaviors
+
+type Writer interface{
+  Write([]byte) (int, error)
+}
+type ConsoleWriter struct{}
+
+他好像是說實作function，是經由signature
+
+
+func(cw ConsoleWriter) Write(data []byte) (int, error){//Write()與Writer介面裡的函式同名，接收的參數與回傳的參數也一致
+  n,err := fmt.Println(string(data))
+  return n, err
+
+}
+
+然後在main()
+var w Writer = ConsoleWriter{}
+w.Write([]byte("Hello Go!"))
+
+
+////喔～我好像懂了
+Writer是一個介面
+ConsoleWriter實作了與Writer介面同名的函式，且有同樣的參數與回傳值
+我們就可以說，ConsoleWriter也是一種Writer
+所以ConsoleWriter is included in Writer，是一種包含的關係
+接著在main()中
+我們先宣告一個Writer，變數名稱為w
+而ConsoleWriter是一種Writer
+所以我們可以直接把ConsoleWriter指給Writer，就是w
+w 現在代表的是ConsoleWriter
+而這個ConsoleWriter也屬於Writer
+我們可以直接去調用Writer裡一定有的Write()
+而這個Write()，我們其實使用的是ConsoleWriter的版本
+
+ConsoleWriter is included in Writer
+so the behavior of Writer have
+then ConsoleWriter would have too
+
+ConsoleWriter屬於Writer
+所以Writer有的行為
+ConsoleWriter也會有
+
+//////看到5:02:42
+
+我們第一個例子是用struct去實作介面，但其實任何類型都可以去實作介面
+
+func main(){
+  myInt := IntCounter(0)
+//一個int類型的變數 可以這樣給0值喔
+//這其實是type conversion的用法，把0轉換成IntCounter類型
+
+
+  var inc Incrementer = &myInt
+  for i:=0; i<10; i++{
+    fmt.Println(inc.Increment())
+
+  }
+
+
+}
+type Incrementer interface {
+  Increment() int
+}
+
+type IntCounter int
+
+func (ic *IntCounter) Increment() int{
+ *ic++
+  return int(*ic)
+
+}
+
+
+_________________________________________繼續///////////////////////////////
+
+現在要談composed interface(make interface of interface)
+/////5:08:53
+
+喔 其實compose interface
+就是make interface of interface
+就是讓interface embbed another interface
+that's it
+
+
+func main() {
+  var wc WriterCloser = NewBufferWriterCloser()
+  wc.Write([]byte("Hello Youtube listeners, this is a test"))
+  wc.Close()
+
+
+}
+type Writer interface {
+  Write([]byte)(int, error)
+
+}
+type Closer interface {
+  Close() error
+}
+
+//用WriterCloser介面去embbed Wrtier與Closer介面
+//這樣WriterCloser介面就會擁有Write()與Close()
+type WriterCloser interface {
+  Writer
+  Closer
+
+}
+
+//然後BufferedWriterCloser struct再去實作WriterCloser介面的兩個function
+//這樣就讓BufferedWriterCloser也屬於WriterCloser一員
+type BufferedWriterCloser struct {
+  buffer *bytes.Buffer
+
+}
+
+func (bwc *BufferedWriterCloser) Write(data []byte)(int, error){
+............
+
+}
+
+func (bwc *BufferedWriterCloser) Close() error{
+.............
+
+}
+
+//BufferedWriterCloser stuct的constructor
+func NewBufferedWriterCloser() *BufferedWriterCloser {
+  return &BufferedWriterCloser{
+    buffer:bytes.NewBuffer([]byte{})
+  }
+
+}
+
+_________________________________________繼續///////////////////////////////
+
+介面與type conversion
+
+func main() {
+  var wc WriterCloser = NewBufferWriterCloser()
+  wc.Write([]byte("Hello Youtube listeners, this is a test"))
+  wc.Close()
+
+  // 雖然我們把BufferWriterCloser指給WriterCloser
+  // 實際也是去調用BufferWriterCloser版本的的write()與close()
+  // 但是呢，我們並不能直接去存取BufferWriterCloser內部的相關變數
+  // 所以假設我們想要直接去存取BufferWriterCloser內部的資料
+  // 我們可以把WriterCloser轉回BufferWriterCloser類型
+  bwc := wc.(*BufferWriterCloser)
+  fmt.Println(bwc)//會印記憶體位置
+
+
+}
+
+然後因為我們想把介面轉成「有實作這個介面的struct」
+但我們會搞不清楚，這個轉型的過程要用指標，還是不用
+我們就可以用comma ok syntax來做確認
+
+//這個是看wc是否可以轉成沒有指標的BufferWriterCloser
+//當然也可以去試，wc是否可以轉成有指標的BufferWriterCloser
+//在這個例子中wc要轉成沒有指標的BufferWriterCloser會失敗
+//BufferWriterCloser struct，實作WriterCloser介面裡的方法，是用指標的方式去實作
+r, ok := wc.(BufferWriterCloser)
+if ok {
+  fmt.Println(r)
+
+}else {
+  fmt.Println("Conversion failed")
+}
+
+_________________________________________繼續///////////////////////////////
+
+現在要講empty interface
+/////5:16:34
+
+empty interface
+
+在main()
+這樣就是把BufferedWriterCloser struct指給一個空介面
+或是可以在main()外，另外去定義一個介面也行，但沒有任何的方法，這樣也是空介面
+直接在main()這樣寫比較快
+var myObj interface{} = NewBufferedWriterCloser()
+
+
+我們可以把這個空介面再轉成WriterCloser介面
+再去調用BufferedWriterCloser版本的Write() and Close()
+r, ok := myObj.(WriterCloser);ok{
+  wc.Write([]byte("Hello YouTube listerners, this is a test"))
+  wc.Close()
+
+}
+
+接著再試著把接收過BufferedWriterCloser的空介面
+轉成io.Reader試試看
+r, ok := myObj.(io.Reader)
+if ok{
+  fmt.Println(r)
+
+}else{
+  fmt.Println("conversion failed")
+}
+
+
+////感覺empty interface這邊當一個暫時的中介
+////之後看狀況再轉成需要的類型
+////再去做事
+
+_________________________________________繼續///////////////////////////////
+
+又回來看switch and type conversion
+
+func main() {
+  // i是一個空介面
+  // 我們把0指給i這個空介面
+  // 我覺得是因為空介面沒有定義任何的方法
+  // 其實任何東西都可以指給空介面
+  // 任何東西都屬於空介面
+  var i interface{} = 0
+
+  我們再利用switch去一一把i轉成各個類型
+  如果轉成功就去印出i屬於甚麼類型
+  switch i.(type) {
+  case int:
+    fmt.Println("i is an integer")
+  case string:
+    fmt.Println("i is a string")
+  default:
+    fmt.Prinlnt("I don't know what i is")
+
+  }
+}
+
+_________________________________________繼續///////////////////////////////
+
+我不知道怎麼講這個東西欸
+如果一個struct去實作介面的function
+用指標或value去實作
+會影響到struct到底能不能成功指給介面
+
+應該說golang怎麼認定一個struct是用指標的方式還是value方式去實作介面
+
+以下列出可以的寫法，自己感受一下
+____________________________________________第一種
+type myWriterCloser struct {}
+
+func(mwc *myWriterClsoer) Write(data []btye) (int, error) {
+......
+
+}
+func (mwc *myWriterClsoer) Close() error{
+.....
+
+}
+
+
+如果在main()
+我們可以寫
+var wc WriterCloser = &myWriterCloser{}
+
+
+__________________________________________第二
+type myWriterCloser struct {}
+
+func(mwc myWriterClsoer) Write(data []btye) (int, error) {
+......
+
+}
+func (mwc myWriterClsoer) Close() error{
+.....
+
+}
+
+
+如果在main()
+我們可以寫
+var wc WriterCloser = &myWriterCloser{}
+
+也可以
+var wc WriterCloser = myWriterCloser{}
+
+_______________________________________第三
+type myWriterCloser struct {}
+
+func(mwc *myWriterClsoer) Write(data []btye) (int, error) {
+......
+
+}
+func (mwc myWriterClsoer) Close() error{
+.....
+
+}
+
+如果在main()
+我們可以寫
+var wc WriterCloser = &myWriterCloser{}
+
+
+_________________________________________繼續///////////////////////////////
+
+最後是談介面的best practice
+/////5:23:40
+聽不懂XDDD
+

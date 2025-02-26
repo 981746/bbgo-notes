@@ -1,0 +1,144 @@
+Arrays and Slices小結：
+
+//////////////////////////////Arrays
+
+*同時宣告與給值array，column equal operter，先定義array size為多少、再來是類型、直接用{}初始化array裡的數值
+舉例：
+grades := [3]int{97, 85, 93}
+
+*array把資料組在一起，不只是讓我們比較好處理相關的資料
+array在記憶體的管理上，讓我們能夠更快速的拿到資料
+
+*同時宣告與給值array，可以一開始先不定義array size為多少(以三個點來表達這個array裡的東西)，而是後面給值的時候size會自動被決定
+舉例：
+grades := [...]int{97, 85, 93}
+
+*我們可以先宣告一個array，但並不馬上給值
+var students [3]string
+
+*先宣告一個array放著，而後才給值
+我們是用array[index] = value這樣的形式來給值
+舉例：
+var students [3]string
+students[0] = "Lisa"
+
+*array size是用len()來取得
+舉例：
+students是一個array
+len(students)
+
+*array of array(二維陣列)//這部分我用不太到，跳過
+
+*go語言的array與其他語言的不同
+
+  a := [...]int{1, 2, 3}
+  b := a
+  b[1] = 5
+  fmt.Println(a)
+  fmt.Println(b)
+
+先宣告、給值array a
+然後把a複製到b
+改b[1]的值
+
+我們去印array a與b
+發現這兩個array的內容不同
+所以把a給b，其實是複製了內容過來，然後建立了一個完全不同的array
+而不是單純的把array a指给b
+
+所以a跟b指向了不同的array
+///
+所以要小心的是
+把array a，assign給b
+其實會複製整個array
+如果array的size很大，那就會拖慢程式的速度
+
+*那有沒有其他的方式不去要copy整個array的內容呢？
+有
+那就是pointer
+b is going to point the same data that a has
+用&這個符號
+那這樣a與b都指向同一份資料
+
+所以
+a it's array itself
+b is pointing to a
+
+舉例：
+  a := [...]int{1, 2, 3}
+  b := &a
+
+*array為fixed size，而slices可以動態新增值
+
+//////////////////////////////Slices
+
+*slice跟array的語法，非常像，只是少了那三個點
+舉例：a := []int{1, 2, 3}
+
+*slice跟array的不同在於，slice本身就是reference type
+所以把a，assign給b
+那a跟b指的是同一份資料
+
+*如何複製slice內容：
+
+(1)slice可以從任意開始index，複製到任意結束index
+語法為
+a[開頭(包含):結束(不包含)]
+ a[8:9] 包含index 8位置的值，不包含index 9位置的值，
+所以a[8:9] = 9
+
+(2)複製整個slice的語法為：a[:]
+(3)從slice起始點複製到結束index：a[:index(不包含)]
+(4)從index複製到整個slice結束：a[index(包含):]
+
+舉例：
+  a := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+  b := a[:]
+  c := a[3:]
+  d := a[:6]
+  e := a[3:6]
+  f := a[8:9]
+
+*slice copy會指向slice，slice變了，copy的內容也會跟著改變
+
+*對array做slicing operation
+這個好有趣喔，複製完了改值
+copy的內容也跟著改欸
+
+所以對array做slicing operation，並不是去複製資料建立新的array
+而是單純的去指位置喔XD
+好奇怪啊XDDD
+
+*用make()來建立slice
+a := make([]int, 3) // slice的type為int，size為3
+
+*a := make([]int, 3, 100)
+//make()還可以填第三個參數capacity
+
+*哦～用appen()等於在本來的容量上，再增加新的容量與元素喔
+還要再增加新的容量，才能容納增加的元素
+Go語言會自動擴展底層數組。這導致新的底層數組大小為原來的兩倍或兩倍再多一點
+
+*slice也可以一次append()多個值：
+a = append(a, 2, 3, 4, 5)
+
+*slice還可以append其他的slice，記得後面要再三個點，程式碼才有辦法執行
+舉例
+a = append(a, []int{2, 3, 4, 5}...)
+b := append(a[:2], a[3:]...)
+
+*slice如何pop出第一個值、最後一個值、中間的值(感覺操作有點複雜，跳過，有需要再來看)
+
+*append()成本很高，請勿隨意使用
+
+*slice copy會指向slice，slice變了，copy的內容也會跟著改變
+
+值得注意的是
+在我們通過一連串操作，複製slice內容後
+我們去改動slice的某個值
+  a[5] = 42
+複製的內容，會有變動
+因為我們的slice copy指向的slice全都是同一個
+源頭變了，所有的copy也會跟著變
+
+_go

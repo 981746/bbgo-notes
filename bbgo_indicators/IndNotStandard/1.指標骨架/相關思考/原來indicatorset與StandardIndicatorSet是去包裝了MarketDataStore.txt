@@ -1,0 +1,33 @@
+原來indicatorset與StandardIndicatorSet是去包裝了MarketDataStore
+store, _ := session.MarketDataStore(symbol)
+
+
+所以不在這兩個Set的指標要自己去preload Kline嗎
+
+
+請看pkg/bbgo/session.go檔案的
+func (session *ExchangeSession) Indicators(symbol string) *IndicatorSet {
+	set, ok := session.indicators[symbol]
+	if ok {
+		return set
+	}
+
+	store, _ := session.MarketDataStore(symbol)
+	set = NewIndicatorSet(symbol, session.MarketDataStream, store)
+	session.indicators[symbol] = set
+	return set
+}
+
+func (session *ExchangeSession) StandardIndicatorSet(symbol string) *StandardIndicatorSet {
+	log.Warnf("StandardIndicatorSet() is deprecated in v1.49.0 and which will be removed in the next version, please use Indicators() instead")
+
+	set, ok := session.standardIndicatorSets[symbol]
+	if ok {
+		return set
+	}
+
+	store, _ := session.MarketDataStore(symbol)
+	set = NewStandardIndicatorSet(symbol, session.MarketDataStream, store)
+	session.standardIndicatorSets[symbol] = set
+	return set
+}

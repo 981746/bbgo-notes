@@ -1,0 +1,21 @@
+exchangeStrategies:
+- on: binance
+  getIndNotStandard:
+    symbol: BTCUSDT
+    interval: 5m
+    window: 60
+   
+backtest:
+  startTime: "2023-12-21"
+  endTime: "2023-12-22"
+  symbols:
+  - BTCUSDT
+  sessions: [binance]
+  # syncSecKLines: true
+  accounts:
+    binance:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 0.0
+        USDT: 10_000.0

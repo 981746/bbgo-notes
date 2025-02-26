@@ -1,0 +1,33 @@
+exchangeStrategies:
+- on: binance
+  getIndV2NotIndSet:
+    symbol: BTCUSDT
+    interval: 5m
+    window: 60
+
+    emaIW:
+      interval: 1h
+      window: 60   
+    rsiIW:
+      interval: 1h
+      window: 60
+    macdSetting:
+      interval: 1h
+      shortWindow: 12
+      longWindow: 26
+      signalWindow: 9   
+backtest:
+  startTime: "2023-12-21"
+  endTime: "2023-12-22"
+  symbols:
+  - BTCUSDT
+  - DOGEUSDT
+  sessions: [binance]
+  # syncSecKLines: true
+  accounts:
+    binance:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 0.0
+        USDT: 10_000.0

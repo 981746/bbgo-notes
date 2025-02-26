@@ -1,0 +1,37 @@
+Constants 小結：
+*其他語言的costant可能是固定全部大寫，而go呢，因為開頭大小寫牽涉到變數的存取範圍
+所以go的constant慣例並不是全部大寫
+一般來說在同一個package的inner constant開頭是小寫
+用camelcase的方式命名
+如果要讓外部的package可以使用，開頭就要改成大寫
+舉例：
+  const myConst int = 42
+or
+  const MyConst int = 42
+
+*如果想要改const的值，是不行的，不然就不能稱為constant
+
+*我們把一個function()塞給constant，這樣也是不行的
+因為function()的結果要執行才能被決定
+而constant的值應該是一開始尚未執行就被決定
+
+*constant可以是int、可以是string、可以是float、可以是boolean
+
+* we can shadow a constant variable
+
+*constant可以跟其他的變數一起做運算
+
+*constant如果沒有註明類型，可以用= operator直接assign
+我記得一般的變數要用:= operator才能直接assign
+
+*常數可以implicit conversion，而一般的變數不行
+
+*enumerated constant，iota是一個計數器，也可以弄成運算式來使用
+
+*每次遇到一個新的const關鍵字時，iota就會重置為0
+
+*iota的計數與重複pattern的特性可以用來算次方
+
+*iota + bitwise operation做權限管理的例子
+
+_go

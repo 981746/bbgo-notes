@@ -1,0 +1,191 @@
+Pointers小結：
+
+*assign 值42給a
+assign a給b
+去印a與b，會印出兩個42
+
+此時把a的值改成27
+再去印出a與b，會印出27 42
+
+所以a與b並不是指向同一份資料
+b拿到的是a的copy
+
+
+*現在改成用一個比較完整的方式去宣告變數a
+  var a int = 42
+如果要用pointer的話，我們要把b指向a
+  var b *int = &a
+在類型前面要再一個*符號，在a的前面要加一個&的符號
+這樣好囉嗦喔
+
+然後結果為a是42
+b是0xc00009c000，所以b拿到的是a為42這份資料的記憶體位置
+
+
+*fmt.Println(a, b)現在改成  fmt.Println(&a, b)
+我們在印a的地方，把a的前面加上&，表示要去印記憶體位置
+可以發現a與b的記憶體位置指向同一個地方
+
+
+*array與struct都可以用指標的方式指向同一個資料集
+我看是直接 := 加上 &，就可以了
+
+那這裡的變數b好像不太一樣欸，用到&，可是指向的是記憶體位置
+但是這個integer是用比較複雜的方式宣告
+  var a int = 42
+  var b *int = &a
+
+欸 等一下
+那如果改成
+a := 42
+b := &a
+b是不是直接可以拿到同一份資料呢？
+不行欸
+所以數字不能用&直接指喔，只會拿到記憶體位置......
+
+array用同樣的方法結果為：[1 2 3] &[1 2 3]
+對啊，b就會出現一個array啊
+
+之前的筆記：
+「*那有沒有其他的方式不去要copy整個array的內容呢？
+有
+那就是pointer
+
+舉例：
+  a := [...]int{1, 2, 3}
+  b := &a
+
+*把struct指給另外一個變數
+那如果你希望兩個變數指向同一個struct
+可以用&這個符號
+anotherDoctor := &aDoctor」
+
+
+*他說用&會指向的是記憶體位置
+想要值的話，這時候要用dereferencing operator
+也就是*
+
+var b *int = &a//宣告的時候 這個星星表示我們要指向的型別為int
+fmt.Println(a, *b)
+//但是呢，當我在print時，在b的前面加上*符號，表達的是
+//表達的是dereference，去把那個記憶體位置的值抓出來
+
+
+
+*我的疑問是，為什麼array與struct不用dereferencing operator啊？
+喔～ 我發現一件事
+array加上dereferencing operator *
+結果會是[1 2 3]
+如果沒用dereferencing operator結果會是&[1 2 3]
+
+原來如此
+array指向記憶體位置，還是看得出array本身的狀況，只是多加了一個&在array前面
+數字指向記憶體位置，0xc00009c000會是這樣一連串看不懂的東西
+不管是數字、array、struct，其實都是要用dereferencing operator *來把值抓出來，才是我們想要的值
+
+
+*a 與 b 要指向同一份資料，b要印的是值而不是記憶體位置
+在fmt.Println()印值時，要用dereferencing operator * 放在變數前方
+
+
+*居然還可以把dereferencing pointer * 加到變數b前方
+然後再assign一個新的值給b
+這樣那個位置就會變成新的值
+
+意思是
+a先定義好
+b是由a來給
+a與b指向同一份資料
+
+我們可以從a來改值  a = 27
+也可以從b來改值，  *b = 14
+
+
+*這邊有一個array 名稱為a
+變數b 指向a[0]這個記憶體位置
+變數c 指向a[1]這個記憶體位置
+
+先印出a這個array
+然後然後印b與c的pointer
+
+欸 我發現fmt.printf的%p 去印b、c值
+與fmt.printf的%v去印b、c值
+結果不同欸(？待研究)
+
+
+*剛剛的例子
+影片上的結果為：
+[1 2 3] 0x1040a124 0x1040a128
+中間差了4
+從其他語言來的開發者像是c以及c++，可能會想要去做pointer的運算
+把c 再減掉 4，想得到 b
+但，go不能這樣算
+
+
+*如果真的想要用pointer運算
+可以用內建lib的unsafe package
+
+
+*這個struct例子
+就算只有一個東西
+我們也可以用指標取得這個東西的記憶體位置
+
+舉例：
+  var ms *myStruct
+  ms = &myStruct{foo: 42}
+  fmt.Println(ms)
+
+*要建立struct，指向這個struct的位置
+還有一個方法是用new()
+但是用new()就不能直接設定值
+所以這個例子的值會是0
+舉例：
+  var ms *myStruct
+  ms = new(myStruct)
+  fmt.Println(ms)
+
+
+*宣告一個struct，用*放在型別前面
+去印這個變數，因為還沒初始化給值
+所以去印的話，會是nil
+所以我們可以用這樣的方式去確認一個變數到底初始化了沒
+如果不使用*放到變數前，只會印出0，不管有沒有初始化都是0
+
+舉例：
+  var ms *myStruct
+  fmt.Println(ms)
+結果：
+<nil>
+
+
+*來一個指標+struct的應用(用這個方式就可以去確認變數為nil還是經過初始化為0)
+宣告一個struct變數，然後*放在型別前
+然後用new()來初始化
+接著用dereferencing operator來給值
+然後再印出ms
+
+舉例：
+ var ms *myStruct
+  ms = new(myStruct)
+  (*ms).foo = 42
+
+  fmt.Println(ms)
+
+結果為：
+&{42}
+
+
+*如果要取foo這個欄位值則是
+用這樣的方式：
+(*ms).foo
+
+
+*然後他說(*ms).foo
+這樣語法太醜了
+所以編譯器其實會幫我們一個忙(語法糖)
+我們可以直接寫ms.foo
+就會得到我們想要的值
+
+
+*有internal pointer的類型有map、slice
+其實就是reference type
